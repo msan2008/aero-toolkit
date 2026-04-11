@@ -1,0 +1,4 @@
+tubercle_amplitude,tubercle_wavelength,tubercle_shape,root_chord,tip_chord,sweep_angle,angle_of_attack,airspeed,separation_x_over_c,air_density,reynolds_number,source_case,lift_proxy,drag_proxy
+0.1,2,rectangular,1,60,10,5,30,0.72,0,0,0,0,0
+0.15,3,sinusoidal_pointed,1,0.5,15,8,35,0.65,0,0,0,0,0
+0.08,2.5,sinusoidal_curvy,1.2,0.7,12,4,28,0.78,0,0,0,0,0

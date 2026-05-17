@@ -7,8 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/1BJJfCFVQQnt1ojiTTnpXAqC_lP0KulUn
 """
 
-pip install streamlit
-
 import sys
 from pathlib import Path
 
@@ -268,3 +266,4 @@ st.caption(
     "Version 1 app note: this is a lightweight ML screening tool connected to a "
     "saved notebook-trained model artifact. It is not a full CFD solver."
 )
+

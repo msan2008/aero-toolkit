@@ -7,15 +7,16 @@ import joblib
 import pandas as pd
 
 # Project paths
-PROJECT_ROOT = Path("models/optimized_extra_trees.joblib").resolve().parent.parent
+PROJECT_ROOT = Path("models/notebook2_gradient_boosting.joblib").resolve().parent.parent
 MODELS_DIR = PROJECT_ROOT / "models"
 
 # Update this list if the final saved model filename changes.
 MODEL_CANDIDATES = [
-    MODELS_DIR / "optimized_random_forest.joblib",
-    MODELS_DIR / "optimized_extra_trees.joblib",
-    MODELS_DIR / "baseline_random_forest.joblib",
-    MODELS_DIR / "baseline_linear_regression.joblib",
+    #MODELS_DIR / "optimized_random_forest.joblib",
+    #MODELS_DIR / "optimized_extra_trees.joblib",
+    #MODELS_DIR / "baseline_random_forest.joblib",
+    #MODELS_DIR / "baseline_linear_regression.joblib",
+    MODELS_DIR / "notebook2_gradient_boosting.joblib",
 ]
 
 # Exact feature columns expected by the trained model pipeline.
@@ -245,15 +246,15 @@ import joblib
 import pandas as pd
 
 # Project paths
-PROJECT_ROOT = Path("models/optimized_extra_trees.joblib").resolve().parent.parent
+PROJECT_ROOT = Path("models/notebook2_gradient_boosting.joblib").resolve().parent.parent
 MODELS_DIR = PROJECT_ROOT / "models"
 
 # Update this list if the final saved model filename changes.
 MODEL_CANDIDATES = [
-    MODELS_DIR / "optimized_random_forest.joblib",
-    MODELS_DIR / "optimized_extra_trees.joblib",
-    MODELS_DIR / "baseline_random_forest.joblib",
-    MODELS_DIR / "baseline_linear_regression.joblib",
+    #MODELS_DIR / "optimized_random_forest.joblib",
+    #MODELS_DIR / "optimized_extra_trees.joblib",
+    #MODELS_DIR / "baseline_random_forest.joblib",
+    MODELS_DIR / "notebook2_gradient_boosting.joblib",
 ]
 
 # Exact feature columns expected by the trained model pipeline.
@@ -490,16 +491,16 @@ import pandas as pd
 # -----------------------------------------------------------------------------
 # Project paths
 # -----------------------------------------------------------------------------
-PROJECT_ROOT = Path("models/optimized_extra_trees.joblib").resolve().parent.parent
+PROJECT_ROOT = Path("models/notebook2_gradient_boosting.joblib").resolve().parent.parent
 MODELS_DIR = PROJECT_ROOT / "models"
 
 # Ordered from most preferred to least preferred. The code will load the first
 # model file that exists in this list.
 MODEL_CANDIDATES = [
-    MODELS_DIR / "optimized_extra_trees.joblib",
-    MODELS_DIR / "optimized_random_forest.joblib",
-    MODELS_DIR / "baseline_random_forest.joblib",
-    MODELS_DIR / "baseline_linear_regression.joblib",
+    #MODELS_DIR / "optimized_extra_trees.joblib",
+    #MODELS_DIR / "optimized_random_forest.joblib",
+    #MODELS_DIR / "baseline_random_forest.joblib",
+    MODELS_DIR / "notebook2_gradient_boosting.joblib",
 ]
 
 # Exact feature schema expected by Notebook 1.5

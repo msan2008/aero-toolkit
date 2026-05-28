@@ -37,6 +37,7 @@ MODELS_DIR = PROJECT_ROOT / "models"
 MODEL_CANDIDATES = [
     MODELS_DIR / "notebook2_gradient_boosting.joblib",
     MODELS_DIR / "notebook2_random_forest.joblib",
+    MODELS_DIR / "notebook2_extra_trees.joblib",
     MODELS_DIR / "optimized_extra_trees.joblib",
     MODELS_DIR / "optimized_random_forest.joblib",
     MODELS_DIR / "baseline_random_forest.joblib",

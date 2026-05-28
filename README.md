@@ -32,9 +32,14 @@ Mention slides, worksheet, and feedback form.
 ## Limitations
 Clearly say this is a prototype screening tool, not a replacement for full CFD, wind tunnel testing, or professional aerodynamic design.
 
+This is a prototype screening tool. This is NOT meant to be a replacement for full CFD, wind tunnel testing, or professional aerodynamic design. This is only meant to help scientists, engineers, drone enthusiasts, etc. with screening different designs quickly.
+
 ## Future Work
 List dataset expansion, physical validation, better model tuning, improved UI, and community testing.
 
 ## Author
 Name, project context, and contact if appropriate.
+
+This model was created by Madhav S Anoop in 2026.
+Contact the author at madhav.anoop2027@gmail.com
 

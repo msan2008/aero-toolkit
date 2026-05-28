@@ -7,11 +7,9 @@ Biomimetic wings have a strong capability of successfully improving aerodynamic 
 Currently, its very time consuming and sometimes expensive for students, hobbyists, engineering clubs, and drone designers to create a design and then test it either in a CFD program or a physical wind tunnel. And even then, the design might not perform well and thus they would have to start from scratch with a new design. This web application allows for these users to quickly test a design to see if it could potentially work - and if it seems that it might be a good design, then they can continue with CFD/wind tunnel testing. This machine learning model can make the design process for building a drone much faster and less stressful. 
 
 ## What the App Does
-List the user inputs and the model output, especially `separation_x_over_c`.
 The user has many options to customize their simulation. The most basic one is the angle of attack of the wing and the airspeed. The user can choose between a symmetrical wing (such as the NACA0012), a cambered wing, and of course, a biomimetic wing. They are also able to choose between the different amplitudes and wavelengths for their tubercles. The model outputs the "separation_x_over_c" which is the location of where the air flow is expected to separate from the surface of the aerofoil as a percentage of the aerofoil's chord. 
 
 ## Current Model Status
-State dataset size, model type, saved model file, and validation status.
 The dataset size currently has ~1750 datapoints - CFD simulations conducted at various angles of attack and airspeeds with different configurations of biomimetic wings, symmetric wings, and cambered wings. The current best performing model is the "extra trees" model.
 
 ## Repository Structure
@@ -24,22 +22,21 @@ Give exact terminal commands.
 Explain that the app is deployed from `app/app.py`.
 
 ## Files Needed for App Integration
-List `app/app.py`, `src/inference.py`, `models/notebook2_gradient_boosting.joblib`, and `requirements.txt`.
+app/app.py
+src/inference.py
+models/themodelname
+requirements.txt
 
 ## Workshop Materials
-Mention slides, worksheet, and feedback form.
+The workshops are meant to teach how to use the web application and interact with the model as well as collecting feedback. Through slides, worksheets, and a feedback form, I am able to teach students, scientists, engineers, etc. how to use this model for their own needs but also learn on how I can improve it further.
 
 ## Limitations
-Clearly say this is a prototype screening tool, not a replacement for full CFD, wind tunnel testing, or professional aerodynamic design.
-
 This is a prototype screening tool. This is NOT meant to be a replacement for full CFD, wind tunnel testing, or professional aerodynamic design. This is only meant to help scientists, engineers, drone enthusiasts, etc. with screening different designs quickly.
 
 ## Future Work
-List dataset expansion, physical validation, better model tuning, improved UI, and community testing.
+Future work will include expanding the dataset, physically validating the model output, better model tuning, an improved user interface, and community testing.
 
 ## Author
-Name, project context, and contact if appropriate.
-
 This model was created by Madhav S Anoop in 2026.
 Contact the author at madhav.anoop2027@gmail.com
 

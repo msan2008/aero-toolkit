@@ -13,13 +13,25 @@ The user has many options to customize their simulation. The most basic one is t
 The dataset size currently has ~1750 datapoints - CFD simulations conducted at various angles of attack and airspeeds with different configurations of biomimetic wings, symmetric wings, and cambered wings. The current best performing model is the "extra trees" model.
 
 ## Repository Structure
-Explain what each folder contains.
+app: the app folder contains the python file and README.md file that consists of the UI that allows the user to use the web application to run the model quickly and easily.
+src: this is the source folder. It contains the utils.py, train_model.py, pre_process.py, and inference.py files.
+data: this contains the dataset used to train the model.
+models: this contains the various models that the user can choose from when using the web applications. 
+notebooks: these are the notebooks that were used to create the .joblib model files.
+outreach: this contains a spreadsheet with a list of our partners and other files related to this project's outreach work.
+workshop: this folder contains the workshop's slides, worksheet, and feedback form.
 
 ## How to Run the App Locally
-Give exact terminal commands.
+In depth instructions can be found in Streamlit's guides.
+1. Create a folder called "aero-toolkit" in your computer's "Documents" folder.
+2. In your computer's local terminal, create a virtual environment within the aero-toolkit folder.
+3. Load the app.py file into the aero-toolkit folder. Create "models" and "src" folders within the aero-toolkit folder. Load the inference.py file into the src folder.
+4. Once you are ready, activate your virtual environment.
+5. To run streamlit, enter "streamlit run app.py"
+6. This should create a "localhost" version of the web application that runs locally and not through the internet.
 
 ## Streamlit Deployment
-Explain that the app is deployed from `app/app.py`.
+The web application is run through Streamlit and is deployed from app/app.py.
 
 ## Files Needed for App Integration
 app/app.py

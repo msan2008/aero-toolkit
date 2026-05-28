@@ -8,10 +8,11 @@ Currently, its very time consuming and sometimes expensive for students, hobbyis
 
 ## What the App Does
 List the user inputs and the model output, especially `separation_x_over_c`.
-The user has many options to customize their simulation. The most basic one is the angle of attack of the wing and the airspeed. The user can choose between a symmetrical wing (such as the NACA0012), a cambered wing, and of course, a biomimetic wing. They are also able to choose between the different amplitudes and wavelengths for their tubercles. They can 
+The user has many options to customize their simulation. The most basic one is the angle of attack of the wing and the airspeed. The user can choose between a symmetrical wing (such as the NACA0012), a cambered wing, and of course, a biomimetic wing. They are also able to choose between the different amplitudes and wavelengths for their tubercles. The model outputs the "separation_x_over_c" which is the location of where the air flow is expected to separate from the surface of the aerofoil as a percentage of the aerofoil's chord. 
 
 ## Current Model Status
 State dataset size, model type, saved model file, and validation status.
+The dataset size currently has ~1750 datapoints - CFD simulations conducted at various angles of attack and airspeeds with different configurations of biomimetic wings, symmetric wings, and cambered wings. The current best performing model is the "extra trees" model.
 
 ## Repository Structure
 Explain what each folder contains.

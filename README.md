@@ -42,8 +42,8 @@ requirements.txt
 ## Workshop Materials
 The workshops are meant to teach how to use the web application and interact with the model as well as collecting feedback. Through slides, worksheets, and a feedback form, I am able to teach students, scientists, engineers, etc. how to use this model for their own needs but also learn on how I can improve it further.
 
-## Limitations
-This is a prototype screening tool. This is NOT meant to be a replacement for full CFD, wind tunnel testing, or professional aerodynamic design. This is only meant to help scientists, engineers, drone enthusiasts, etc. with screening different designs quickly.
+## Current Limitations
+This is a prototype screening tool, currently in Phase 2. This is NOT meant to be a replacement for full CFD, wind tunnel testing, or professional aerodynamic design. This is only meant to help scientists, engineers, drone enthusiasts, etc. with screening different designs quickly.
 
 ## Future Work
 Future work will include expanding the dataset, physically validating the model output, better model tuning, an improved user interface, and community testing.

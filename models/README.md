@@ -1,1 +1,1 @@
-
+The current production model is notebook2_extra_trees.joblib. All the other models are older iterations that can still provide fairly accurate results. I highly recommend using the notebook2_extra_trees.joblib though!

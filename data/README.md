@@ -1,4 +1,3 @@
-#Columns
 Airfoil_family: This represents what type of aerofoil the design being tested is - biomimetic, symmetric, or cambered.
 tubercle_amplitude: Since the biomimetic tubercles are in the shape of a sinusoidal wave, the "length" of the tubercles from the bottom to the top is the amplitude (in mm).
 tubercle_wavelength: This is the wavelength of the sinusoidal shape the tubercle takes. This is the distance between the tops of each tubercle (in mm).

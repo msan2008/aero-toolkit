@@ -1,5 +1,8 @@
 # Aero Toolkit: Biomimetic Drone Wing Screening Tool
 
+## Summary
+This project uses simulation data and machine learning to predict flow separation risk for standard and whale-inspired drone wing designs.
+
 ## Project Overview
 Biomimetic wings have a strong capability of successfully improving aerodynamic efficiency for drones and other aircraft by delaying flow separation. However, current CFD solutions, may are not able to quickly predict flow separation, especially in complicated designs with biomimetic features. This tool uses machine learning to quickly predict the exact point of separation in a wing design, allowing engineers, scientists, and drone enthusiasts to quickly find a design that could potentially improve their craft's aerodynamic efficiency. 
 
@@ -40,7 +43,7 @@ models/themodelname
 requirements.txt
 
 ## Workshop Materials
-The workshops are meant to teach how to use the web application and interact with the model as well as collecting feedback. Through slides, worksheets, and a feedback form, I am able to teach students, scientists, engineers, etc. how to use this model for their own needs but also learn on how I can improve it further.
+The workshops are meant to teach how to use the web application and interact with the model as well as collecting feedback. Through slides, worksheets, and a feedback form, I am able to teach students, scientists, engineers, etc. how to use this model for their own needs but also learn on how I can improve it further. Workshop resources can be found in the repository's workshop folder.
 
 ## Current Limitations
 This is a prototype screening tool, currently in Phase 2. This is NOT meant to be a replacement for full CFD, wind tunnel testing, or professional aerodynamic design. This is only meant to help scientists, engineers, drone enthusiasts, etc. with screening different designs quickly.

@@ -36,6 +36,15 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    html, body, [class*="css"], .stApp,
+    .stMarkdown, .stText,
+    h1, h2, h3, h4, h5, h6, p, span, label, div,
+    button, input, select, textarea,
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricLabel"] {
+        font-family: 'Marcellus', 'Optima', 'Candara', serif !important;
+    }
+
     .main .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;

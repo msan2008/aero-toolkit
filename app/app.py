@@ -36,7 +36,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-     @import url('https://fonts.googleapis.com/css2?family=Marcellus&display=swap');
     html, body, [class*="css"], .stApp,
     .stMarkdown, .stText,
     h1, h2, h3, h4, h5, h6, p, span, label, div,
@@ -221,7 +220,7 @@ with st.expander("What this prototype can and cannot do"):
 # Sidebar inputs
 # -----------------------------------------------------------------------------
 st.sidebar.header("1. Wing and Flow Inputs")
-st.sidebar.caption("Change the variables, then run the model to see how the predicted separation point responds.")
+st.sidebar.caption("Drag the sliders, then run the model to see how the predicted separation point responds.")
 
 airfoil_family = st.sidebar.selectbox(
     "Airfoil Family",
@@ -230,47 +229,39 @@ airfoil_family = st.sidebar.selectbox(
     help="The broad wing type. Biomimetic wings use nature-inspired features such as tubercles.",
 )
 
+# Tubercle controls only apply to biomimetic wings. Rendering them conditionally
+# (instead of disabling them) means leftover amplitude/wavelength values can never
+# leak into the model when a non-biomimetic family is selected.
 if airfoil_family == "biomimetic":
-    tubercle_shape_options = ["whale", "biomimetic_v1"]
-    default_tubercle_shape_index = 0
-    tubercle_disabled = False
-    default_amplitude = 26.247
-    default_wavelength = 49.607
+    tubercle_shape = st.sidebar.selectbox(
+        "Tubercle Shape",
+        ["whale", "biomimetic_v1"],
+        index=0,
+        help="The tubercle pattern used for biomimetic wings.",
+    )
+    tubercle_amplitude = st.sidebar.slider(
+        "Tubercle Amplitude",
+        min_value=26.247,
+        max_value=32.734,
+        value=26.247,
+        step=0.1,
+        help="How tall the tubercle bumps are. Larger values represent more pronounced biomimetic features.",
+    )
+    tubercle_wavelength = st.sidebar.slider(
+        "Tubercle Wavelength",
+        min_value=42.337,
+        max_value=49.607,
+        value=49.607,
+        step=0.1,
+        help="The spacing between tubercle peaks. This helps define the biomimetic pattern.",
+    )
 else:
-    tubercle_shape_options = ["none"]
-    default_tubercle_shape_index = 0
-    tubercle_disabled = True
-    default_amplitude = 0.0
-    default_wavelength = 0.0
+    tubercle_shape = "none"
+    tubercle_amplitude = 0.0
+    tubercle_wavelength = 0.0
+    st.sidebar.caption("Tubercle controls appear when the airfoil family is set to *biomimetic*.")
 
-tubercle_shape = st.sidebar.selectbox(
-    "Tubercle Shape",
-    tubercle_shape_options,
-    index=default_tubercle_shape_index,
-    help="The tubercle pattern used for biomimetic wings. Non-biomimetic wings use 'none'.",
-)
-
-tubercle_amplitude = st.sidebar.number_input(
-    "Tubercle Amplitude",
-    min_value=0.0,
-    max_value=100.0,
-    value=float(default_amplitude),
-    step=0.1,
-    disabled=tubercle_disabled,
-    help="How tall the tubercle bumps are. Larger values represent more pronounced biomimetic features.",
-)
-
-tubercle_wavelength = st.sidebar.number_input(
-    "Tubercle Wavelength",
-    min_value=0.0,
-    max_value=200.0,
-    value=float(default_wavelength),
-    step=0.1,
-    disabled=tubercle_disabled,
-    help="The spacing between tubercle peaks. This helps define the biomimetic pattern.",
-)
-
-root_chord = st.sidebar.number_input(
+root_chord = st.sidebar.slider(
     "Root Chord",
     min_value=0.1,
     max_value=10.0,
@@ -279,7 +270,7 @@ root_chord = st.sidebar.number_input(
     help="Chord length near the wing root.",
 )
 
-tip_chord = st.sidebar.number_input(
+tip_chord = st.sidebar.slider(
     "Tip Chord",
     min_value=0.1,
     max_value=10.0,
@@ -288,7 +279,7 @@ tip_chord = st.sidebar.number_input(
     help="Chord length near the wing tip.",
 )
 
-sweep_angle = st.sidebar.number_input(
+sweep_angle = st.sidebar.slider(
     "Sweep Angle (degrees)",
     min_value=0.0,
     max_value=80.0,
@@ -297,21 +288,19 @@ sweep_angle = st.sidebar.number_input(
     help="How much the wing sweeps backward from root to tip.",
 )
 
-angle_of_attack = st.sidebar.number_input(
+angle_of_attack = st.sidebar.slider(
     "Angle of Attack (degrees)",
-    min_value=-10.0,
-    max_value=30.0,
+    min_value=0.0,
+    max_value=25.0,
     value=10.0,
-    step=1.0,
+    step=0.5,
     help="The angle between the incoming airflow and the wing chord line.",
 )
 
-airspeed = st.sidebar.number_input(
+airspeed = st.sidebar.selectbox(
     "Airspeed",
-    min_value=0.1,
-    max_value=300.0,
-    value=30.0,
-    step=1.0,
+    [15, 30],
+    index=1,
     help="The relative speed of airflow over the wing.",
 )
 
@@ -377,22 +366,27 @@ if run_clicked:
 if st.session_state.latest_prediction is not None:
     prediction = st.session_state.latest_prediction
     label = st.session_state.latest_label
+    saved = st.session_state.latest_input_dict
 
     metric_col1, metric_col2, metric_col3 = st.columns(3)
     metric_col1.metric("Predicted separation_x_over_c", f"{prediction:.4f}")
     metric_col2.metric("Flow interpretation", label)
     metric_col3.metric("Separation location", f"{prediction * 100:.1f}% chord")
 
+    # Plot geometry is read from the saved prediction inputs, not the live
+    # sliders, so changing a slider without re-running cannot desync the chart
+    # from the displayed prediction value.
     fig = plot_airfoil_and_separation(
-        root_chord=root_chord,
-        tip_chord=tip_chord,
-        sweep_angle=sweep_angle,
+        root_chord=saved["root_chord"],
+        tip_chord=saved["tip_chord"],
+        sweep_angle=saved["sweep_angle"],
         separation_x_over_c=prediction,
-        airfoil_family=airfoil_family,
+        airfoil_family=saved["airfoil_family"],
     )
     st.pyplot(fig)
+    plt.close(fig)
 
-    output_df = pd.DataFrame([st.session_state.latest_input_dict])
+    output_df = pd.DataFrame([saved])
     output_df["predicted_separation_x_over_c"] = prediction
     st.write("Prediction record")
     st.dataframe(output_df, use_container_width=True)
@@ -439,7 +433,7 @@ with calc_col2:
         help="Use the number of flights in a season, school year, club project, or test campaign.",
     )
 with calc_col3:
-    carbon_factor_kg_per_kwh = st.number_input(
+    carbon_factor_kg_per_kwh = st.slider(
         "Carbon factor (kg CO₂/kWh)",
         min_value=0.0,
         max_value=2.0,

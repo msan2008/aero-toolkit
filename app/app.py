@@ -181,45 +181,52 @@ st.markdown(
     """
 )
 
-intro_col1, intro_col2, intro_col3 = st.columns(3)
-with intro_col1:
-    st.markdown(
-        '<div class="info-card"><b>Input</b><br><span class="small-note">Wing family, tubercle geometry, chord lengths, sweep, angle of attack, and airspeed.</span></div>',
-        unsafe_allow_html=True,
-    )
-with intro_col2:
-    st.markdown(
-        '<div class="info-card"><b>Output</b><br><span class="small-note">Predicted separation location along the normalized chord, x/c.</span></div>',
-        unsafe_allow_html=True,
-    )
-with intro_col3:
-    st.markdown(
-        '<div class="info-card"><b>Sustainability Lens</b><br><span class="small-note">Use the prediction to discuss how efficient designs can reduce wasted flight energy.</span></div>',
-        unsafe_allow_html=True,
-    )
+show_explanations = st.toggle(
+    "Show explanations",
+    value=True,
+    help="Turn off to hide the descriptive panels and expanders for a cleaner view.",
+)
 
-with st.expander("What this prototype can and cannot do"):
-    st.markdown(
-        """
-        **This app can:**
-        - accept parameterized wing and flow inputs;
-        - predict `separation_x_over_c` using the trained model;
-        - visualize where separation is predicted to occur;
-        - support a classroom discussion about energy use and sustainability.
+if show_explanations:
+    intro_col1, intro_col2, intro_col3 = st.columns(3)
+    with intro_col1:
+        st.markdown(
+            '<div class="info-card"><b>Input</b><br><span class="small-note">Wing family, tubercle geometry, chord lengths, sweep, angle of attack, and airspeed.</span></div>',
+            unsafe_allow_html=True,
+        )
+    with intro_col2:
+        st.markdown(
+            '<div class="info-card"><b>Output</b><br><span class="small-note">Predicted separation location along the normalized chord, x/c.</span></div>',
+            unsafe_allow_html=True,
+        )
+    with intro_col3:
+        st.markdown(
+            '<div class="info-card"><b>Sustainability Lens</b><br><span class="small-note">Use the prediction to discuss how efficient designs can reduce wasted flight energy.</span></div>',
+            unsafe_allow_html=True,
+        )
 
-        **This app cannot:**
-        - replace full CFD simulation;
-        - replace wind-tunnel testing;
-        - accept raw STL/STEP CAD uploads;
-        - certify a real aircraft or drone design;
-        - directly calculate true lift, drag, battery life, or emissions.
-        """
-    )
+    with st.expander("What this prototype can and cannot do"):
+        st.markdown(
+            """
+            **This app can:**
+            - accept parameterized wing and flow inputs;
+            - predict `separation_x_over_c` using the trained model;
+            - visualize where separation is predicted to occur;
+            - support a classroom discussion about energy use and sustainability.
+
+            **This app cannot:**
+            - replace full CFD simulation;
+            - replace wind-tunnel testing;
+            - accept raw STL/STEP CAD uploads;
+            - certify a real aircraft or drone design;
+            - directly calculate true lift, drag, battery life, or emissions.
+            """
+        )
 
 # -----------------------------------------------------------------------------
 # Sidebar inputs
 # -----------------------------------------------------------------------------
-st.sidebar.header("Wing and Flow Inputs")
+st.sidebar.header("1. Wing and Flow Inputs")
 st.sidebar.caption("Drag the sliders, then run the model to see how the predicted separation point responds.")
 
 airfoil_family = st.sidebar.selectbox(
@@ -305,14 +312,15 @@ input_dict = {
 # -----------------------------------------------------------------------------
 # Diagnostics
 # -----------------------------------------------------------------------------
-with st.expander("Model and input diagnostics"):
-    st.write("Current input dictionary:")
-    st.json(input_dict)
-    st.write("Expected model feature order:")
-    st.write(get_required_feature_columns())
-    st.caption(
-        "If prediction fails, first check that the model file in models/ has the same filename expected by src/inference.py."
-    )
+if show_explanations:
+    with st.expander("Model and input diagnostics"):
+        st.write("Current input dictionary:")
+        st.json(input_dict)
+        st.write("Expected model feature order:")
+        st.write(get_required_feature_columns())
+        st.caption(
+            "If prediction fails, first check that the model file in models/ has the same filename expected by src/inference.py."
+        )
 
 # -----------------------------------------------------------------------------
 # Prediction block

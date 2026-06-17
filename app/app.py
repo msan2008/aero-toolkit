@@ -169,6 +169,41 @@ def build_sustainability_table(
 
 
 # -----------------------------------------------------------------------------
+# Welcome page
+# -----------------------------------------------------------------------------
+# A simple session-state gate: until the user clicks through, only the welcome
+# screen renders. st.stop() halts the script so the rest of the app (including
+# the sidebar inputs) is not drawn behind the welcome page.
+if "entered" not in st.session_state:
+    st.session_state.entered = False
+
+if not st.session_state.entered:
+    st.markdown("<div style='height: 6vh;'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<h1 style='text-align: center; font-size: 3rem;'>Welcome to Aero-Toolkit</h1>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<p style='text-align: center;' class='small-note'>"
+        "A lightweight machine-learning tool for screening biomimetic wing designs "
+        "before committing to CFD or wind-tunnel testing."
+        "</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
+
+    spacer_left, center_col, spacer_right = st.columns([1, 2, 1])
+    with center_col:
+        if st.button(
+            "Enter the Biomimetic Wing Screening Tool",
+            type="primary",
+            use_container_width=True,
+        ):
+            st.session_state.entered = True
+            st.rerun()
+    st.stop()
+
+# -----------------------------------------------------------------------------
 # App title and overview
 # -----------------------------------------------------------------------------
 st.title("Aero Toolkit: Biomimetic Wing Screening Tool")
@@ -264,7 +299,7 @@ if show_explanations:
 # -----------------------------------------------------------------------------
 # Sidebar inputs
 # -----------------------------------------------------------------------------
-st.sidebar.header("Wing and Flow Inputs")
+st.sidebar.header("1. Wing and Flow Inputs")
 st.sidebar.caption("Drag the sliders, then run the model to see how the predicted separation point responds.")
 
 airfoil_family = st.sidebar.selectbox(
@@ -364,7 +399,7 @@ if show_explanations:
 # Prediction block
 # -----------------------------------------------------------------------------
 if show_prediction:
-    st.subheader("Model Prediction")
+    st.subheader("2. Model Prediction")
 
     run_col, note_col = st.columns([1, 3])
     with run_col:
@@ -423,7 +458,7 @@ if show_prediction:
 # Sustainability section
 # -----------------------------------------------------------------------------
 if show_sustainability:
-    st.subheader("Sustainability Lens")
+    st.subheader("3. Sustainability Lens")
     st.markdown(
         """
         Aerodynamically efficient designs can help drones and small aircraft use less

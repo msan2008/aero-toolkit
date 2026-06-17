@@ -45,6 +45,15 @@ st.markdown(
         font-family: 'Marcellus', 'Optima', 'Candara', serif !important;
     }
 
+
+    [data-testid="stIconMaterial"],
+    span[class*="material-icons"],
+    [class*="material-symbols"],
+    .material-icons,
+    .material-icons-outlined {
+        font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
+    }
+
     .main .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -64,7 +73,7 @@ st.markdown(
     </style>
     """,
     unsafe_allow_html=True,
-)
+))
 
 # -----------------------------------------------------------------------------
 # Helper functions

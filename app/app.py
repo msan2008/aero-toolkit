@@ -219,7 +219,7 @@ with st.expander("What this prototype can and cannot do"):
 # -----------------------------------------------------------------------------
 # Sidebar inputs
 # -----------------------------------------------------------------------------
-st.sidebar.header("1. Wing and Flow Inputs")
+st.sidebar.header("Wing and Flow Inputs")
 st.sidebar.caption("Drag the sliders, then run the model to see how the predicted separation point responds.")
 
 airfoil_family = st.sidebar.selectbox(

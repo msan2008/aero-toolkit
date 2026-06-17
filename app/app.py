@@ -35,8 +35,8 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 st.markdown(
     """
-    @import url('https://fonts.googleapis.com/css2?family=Marcellus&display=swap');
     <style>
+     @import url('https://fonts.googleapis.com/css2?family=Marcellus&display=swap');
     html, body, [class*="css"], .stApp,
     .stMarkdown, .stText,
     h1, h2, h3, h4, h5, h6, p, span, label, div,

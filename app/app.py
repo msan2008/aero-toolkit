@@ -302,7 +302,7 @@ if show_explanations:
 # -----------------------------------------------------------------------------
 # Sidebar inputs
 # -----------------------------------------------------------------------------
-st.sidebar.header("1. Wing and Flow Inputs")
+st.sidebar.header("Wing and Flow Inputs")
 st.sidebar.caption("Drag the sliders, then run the model to see how the predicted separation point responds.")
 
 airfoil_family = st.sidebar.selectbox(
@@ -402,7 +402,7 @@ if show_explanations:
 # Prediction block
 # -----------------------------------------------------------------------------
 if show_prediction:
-    st.subheader("2. Model Prediction")
+    st.subheader("Model Prediction")
 
     run_col, note_col = st.columns([1, 3])
     with run_col:
@@ -461,7 +461,7 @@ if show_prediction:
 # Sustainability section
 # -----------------------------------------------------------------------------
 if show_sustainability:
-    st.subheader("3. Sustainability Lens")
+    st.subheader("Sustainability Lens")
     st.markdown(
         """
         Aerodynamically efficient designs can help drones and small aircraft use less

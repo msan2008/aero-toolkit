@@ -70,6 +70,9 @@ st.markdown(
         font-size: 0.92rem;
         opacity: 0.82;
     }
+    [data-testid="stSidebar"] {
+        background-color: #eaf3fc;
+    }
     </style>
     """,
     unsafe_allow_html=True,

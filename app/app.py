@@ -261,31 +261,17 @@ else:
     tubercle_wavelength = 0.0
     st.sidebar.caption("Tubercle controls appear when the airfoil family is set to *biomimetic*.")
 
-root_chord = st.sidebar.slider(
-    "Root Chord",
-    min_value=0.1,
-    max_value=10.0,
-    value=1.0,
-    step=0.1,
-    help="Chord length near the wing root.",
-)
+# Wing geometry is fixed for this screening configuration, so it is shown as a
+# read-only summary rather than as adjustable inputs.
+root_chord = 1.0
+tip_chord = 1.0
+sweep_angle = 0.0
 
-tip_chord = st.sidebar.slider(
-    "Tip Chord",
-    min_value=0.1,
-    max_value=10.0,
-    value=1.0,
-    step=0.1,
-    help="Chord length near the wing tip.",
-)
-
-sweep_angle = st.sidebar.slider(
-    "Sweep Angle (degrees)",
-    min_value=0.0,
-    max_value=80.0,
-    value=0.0,
-    step=1.0,
-    help="How much the wing sweeps backward from root to tip.",
+st.sidebar.markdown("**Fixed Wing Geometry**")
+st.sidebar.markdown(
+    f"- Root Chord: **{root_chord:.0f}**\n"
+    f"- Tip Chord: **{tip_chord:.0f}**\n"
+    f"- Sweep Angle: **{sweep_angle:.0f}°**"
 )
 
 angle_of_attack = st.sidebar.slider(

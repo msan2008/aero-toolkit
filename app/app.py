@@ -181,11 +181,49 @@ st.markdown(
     """
 )
 
-show_explanations = st.toggle(
-    "Show explanations",
-    value=True,
-    help="Turn off to hide the descriptive panels and expanders for a cleaner view.",
-)
+st.markdown("**Display options**")
+opt_col1, opt_col2, opt_col3, opt_col4 = st.columns(4)
+with opt_col1:
+    show_explanations = st.toggle(
+        "Explanations",
+        value=True,
+        help="Show or hide the descriptive panels and expanders.",
+    )
+with opt_col2:
+    show_prediction = st.toggle(
+        "Model Prediction",
+        value=True,
+        help="Show or hide the Model Prediction section.",
+    )
+with opt_col3:
+    show_sustainability = st.toggle(
+        "Sustainability Lens",
+        value=True,
+        help="Show or hide the Sustainability Lens section.",
+    )
+with opt_col4:
+    show_sidebar = st.toggle(
+        "Input sidebar",
+        value=True,
+        help="Show or hide the input sidebar.",
+    )
+
+# Hide the input sidebar on request. The sidebar widgets still execute, so every
+# input variable stays defined; only the panel itself is visually removed.
+if not show_sidebar:
+    st.markdown(
+        "<style>[data-testid='stSidebar'] {display: none;}</style>",
+        unsafe_allow_html=True,
+    )
+
+# Initialize prediction state once, independent of which sections are visible,
+# so hiding the Model Prediction section never leaves the state undefined.
+if "latest_prediction" not in st.session_state:
+    st.session_state.latest_prediction = None
+if "latest_input_dict" not in st.session_state:
+    st.session_state.latest_input_dict = None
+if "latest_label" not in st.session_state:
+    st.session_state.latest_label = None
 
 if show_explanations:
     intro_col1, intro_col2, intro_col3 = st.columns(3)
@@ -325,126 +363,121 @@ if show_explanations:
 # -----------------------------------------------------------------------------
 # Prediction block
 # -----------------------------------------------------------------------------
-st.subheader("Model Prediction")
+if show_prediction:
+    st.subheader("Model Prediction")
 
-run_col, note_col = st.columns([1, 3])
-with run_col:
-    run_clicked = st.button("Run Prediction", type="primary", use_container_width=True)
-with note_col:
-    st.caption("A later separation point, closer to x/c = 1, generally indicates more attached flow in this simplified screening context.")
+    run_col, note_col = st.columns([1, 3])
+    with run_col:
+        run_clicked = st.button("Run Prediction", type="primary", use_container_width=True)
+    with note_col:
+        st.caption("A later separation point, closer to x/c = 1, generally indicates more attached flow in this simplified screening context.")
 
-if "latest_prediction" not in st.session_state:
-    st.session_state.latest_prediction = None
-if "latest_input_dict" not in st.session_state:
-    st.session_state.latest_input_dict = None
-if "latest_label" not in st.session_state:
-    st.session_state.latest_label = None
+    if run_clicked:
+        try:
+            prediction = float(predict_from_dict(input_dict))
+            label = describe_prediction(prediction)
+            st.session_state.latest_prediction = prediction
+            st.session_state.latest_input_dict = dict(input_dict)
+            st.session_state.latest_label = label
+        except Exception as e:
+            st.session_state.latest_prediction = None
+            st.session_state.latest_input_dict = None
+            st.session_state.latest_label = None
+            st.error(f"Prediction failed: {e}")
+            st.info(
+                "This is usually a model-file synchronization issue. Check that the saved .joblib model is present in the models/ folder, "
+                "that the model filename matches what src/inference.py expects, and that the app inputs match the training feature schema exactly."
+            )
 
-if run_clicked:
-    try:
-        prediction = float(predict_from_dict(input_dict))
-        label = describe_prediction(prediction)
-        st.session_state.latest_prediction = prediction
-        st.session_state.latest_input_dict = dict(input_dict)
-        st.session_state.latest_label = label
-    except Exception as e:
-        st.session_state.latest_prediction = None
-        st.session_state.latest_input_dict = None
-        st.session_state.latest_label = None
-        st.error(f"Prediction failed: {e}")
-        st.info(
-            "This is usually a model-file synchronization issue. Check that the saved .joblib model is present in the models/ folder, "
-            "that the model filename matches what src/inference.py expects, and that the app inputs match the training feature schema exactly."
+    if st.session_state.latest_prediction is not None:
+        prediction = st.session_state.latest_prediction
+        label = st.session_state.latest_label
+        saved = st.session_state.latest_input_dict
+
+        metric_col1, metric_col2, metric_col3 = st.columns(3)
+        metric_col1.metric("Predicted separation_x_over_c", f"{prediction:.4f}")
+        metric_col2.metric("Flow interpretation", label)
+        metric_col3.metric("Separation location", f"{prediction * 100:.1f}% chord")
+
+        # Plot geometry is read from the saved prediction inputs, not the live
+        # sliders, so changing a slider without re-running cannot desync the chart
+        # from the displayed prediction value.
+        fig = plot_airfoil_and_separation(
+            root_chord=saved["root_chord"],
+            tip_chord=saved["tip_chord"],
+            sweep_angle=saved["sweep_angle"],
+            separation_x_over_c=prediction,
+            airfoil_family=saved["airfoil_family"],
         )
+        st.pyplot(fig)
+        plt.close(fig)
 
-if st.session_state.latest_prediction is not None:
-    prediction = st.session_state.latest_prediction
-    label = st.session_state.latest_label
-    saved = st.session_state.latest_input_dict
-
-    metric_col1, metric_col2, metric_col3 = st.columns(3)
-    metric_col1.metric("Predicted separation_x_over_c", f"{prediction:.4f}")
-    metric_col2.metric("Flow interpretation", label)
-    metric_col3.metric("Separation location", f"{prediction * 100:.1f}% chord")
-
-    # Plot geometry is read from the saved prediction inputs, not the live
-    # sliders, so changing a slider without re-running cannot desync the chart
-    # from the displayed prediction value.
-    fig = plot_airfoil_and_separation(
-        root_chord=saved["root_chord"],
-        tip_chord=saved["tip_chord"],
-        sweep_angle=saved["sweep_angle"],
-        separation_x_over_c=prediction,
-        airfoil_family=saved["airfoil_family"],
-    )
-    st.pyplot(fig)
-    plt.close(fig)
-
-    output_df = pd.DataFrame([saved])
-    output_df["predicted_separation_x_over_c"] = prediction
-    st.write("Prediction record")
-    st.dataframe(output_df, use_container_width=True)
-else:
-    st.info("Adjust the inputs in the sidebar, then click **Run Prediction**.")
+        output_df = pd.DataFrame([saved])
+        output_df["predicted_separation_x_over_c"] = prediction
+        st.write("Prediction record")
+        st.dataframe(output_df, use_container_width=True)
+    else:
+        st.info("Adjust the inputs in the sidebar, then click **Run Prediction**.")
 
 # -----------------------------------------------------------------------------
 # Sustainability section
 # -----------------------------------------------------------------------------
-st.subheader("Sustainability Lens")
-st.markdown(
-    """
-    Aerodynamically efficient designs can help drones and small aircraft use less
-    energy because less energy is wasted fighting separated, turbulent flow. This
-    section is an **educational scenario calculator**, not a certified emissions model.
-    Use it to explore how small efficiency improvements could scale across many flights.
-    """
-)
-
-if st.session_state.latest_prediction is not None:
-    sustain_label, sustain_text = sustainability_interpretation(st.session_state.latest_prediction)
-    st.markdown(f"**Prediction-based design note:** {sustain_label}")
-    st.write(sustain_text)
-else:
-    st.caption("Run a prediction first to connect the sustainability discussion to the selected wing design.")
-
-calc_col1, calc_col2, calc_col3 = st.columns(3)
-with calc_col1:
-    energy_per_flight_wh = st.number_input(
-        "Estimated energy per flight (Wh)",
-        min_value=1.0,
-        max_value=100000.0,
-        value=100.0,
-        step=10.0,
-        help="Example: a small drone flight might use tens to hundreds of watt-hours. Use a value appropriate for your scenario.",
-    )
-with calc_col2:
-    number_of_flights = st.number_input(
-        "Number of flights",
-        min_value=1,
-        max_value=100000,
-        value=100,
-        step=10,
-        help="Use the number of flights in a season, school year, club project, or test campaign.",
-    )
-with calc_col3:
-    carbon_factor_kg_per_kwh = st.slider(
-        "Carbon factor (kg CO₂/kWh)",
-        min_value=0.0,
-        max_value=2.0,
-        value=0.40,
-        step=0.01,
-        help="Classroom placeholder. Update this value if you know the local electricity emissions factor.",
+if show_sustainability:
+    st.subheader("Sustainability Lens")
+    st.markdown(
+        """
+        Aerodynamically efficient designs can help drones and small aircraft use less
+        energy because less energy is wasted fighting separated, turbulent flow. This
+        section is an **educational scenario calculator**, not a certified emissions model.
+        Use it to explore how small efficiency improvements could scale across many flights.
+        """
     )
 
-sustainability_df = build_sustainability_table(
-    energy_per_flight_wh=energy_per_flight_wh,
-    number_of_flights=int(number_of_flights),
-    carbon_factor_kg_per_kwh=carbon_factor_kg_per_kwh,
-)
-st.dataframe(sustainability_df, use_container_width=True)
-st.caption(
-    "Important: the efficiency percentages above are what-if assumptions for discussion. The current model predicts separation location only, not true drag, battery life, or emissions."
-)
+    if st.session_state.latest_prediction is not None:
+        sustain_label, sustain_text = sustainability_interpretation(st.session_state.latest_prediction)
+        st.markdown(f"**Prediction-based design note:** {sustain_label}")
+        st.write(sustain_text)
+    else:
+        st.caption("Run a prediction first to connect the sustainability discussion to the selected wing design.")
+
+    calc_col1, calc_col2, calc_col3 = st.columns(3)
+    with calc_col1:
+        energy_per_flight_wh = st.number_input(
+            "Estimated energy per flight (Wh)",
+            min_value=1.0,
+            max_value=100000.0,
+            value=100.0,
+            step=10.0,
+            help="Example: a small drone flight might use tens to hundreds of watt-hours. Use a value appropriate for your scenario.",
+        )
+    with calc_col2:
+        number_of_flights = st.number_input(
+            "Number of flights",
+            min_value=1,
+            max_value=100000,
+            value=100,
+            step=10,
+            help="Use the number of flights in a season, school year, club project, or test campaign.",
+        )
+    with calc_col3:
+        carbon_factor_kg_per_kwh = st.slider(
+            "Carbon factor (kg CO₂/kWh)",
+            min_value=0.0,
+            max_value=2.0,
+            value=0.40,
+            step=0.01,
+            help="Classroom placeholder. Update this value if you know the local electricity emissions factor.",
+        )
+
+    sustainability_df = build_sustainability_table(
+        energy_per_flight_wh=energy_per_flight_wh,
+        number_of_flights=int(number_of_flights),
+        carbon_factor_kg_per_kwh=carbon_factor_kg_per_kwh,
+    )
+    st.dataframe(sustainability_df, use_container_width=True)
+    st.caption(
+        "Important: the efficiency percentages above are what-if assumptions for discussion. The current model predicts separation location only, not true drag, battery life, or emissions."
+    )
 
 # -----------------------------------------------------------------------------
 # Footer note

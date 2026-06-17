@@ -325,7 +325,7 @@ if show_explanations:
 # -----------------------------------------------------------------------------
 # Prediction block
 # -----------------------------------------------------------------------------
-st.subheader("2. Model Prediction")
+st.subheader("Model Prediction")
 
 run_col, note_col = st.columns([1, 3])
 with run_col:
@@ -390,7 +390,7 @@ else:
 # -----------------------------------------------------------------------------
 # Sustainability section
 # -----------------------------------------------------------------------------
-st.subheader("3. Sustainability Lens")
+st.subheader("Sustainability Lens")
 st.markdown(
     """
     Aerodynamically efficient designs can help drones and small aircraft use less

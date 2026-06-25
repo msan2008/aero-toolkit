@@ -267,9 +267,9 @@ input_dict = {
 # Sidebar Display Options
 # -----------------------------------------------------------------------------
 st.sidebar.header("Display Options")
-show_explanations = st.sidebar.toggle("Explanations", value=True)
+show_explanations = st.sidebar.toggle("Explanations", value=False)
 show_prediction = st.sidebar.toggle("Model Prediction", value=True)
-show_sustainability = st.sidebar.toggle("Sustainability Lens", value=True)
+show_sustainability = st.sidebar.toggle("Sustainability Lens", value=False)
 
 if "latest_prediction" not in st.session_state:
     st.session_state.latest_prediction = None

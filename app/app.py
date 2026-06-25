@@ -224,7 +224,7 @@ sweep_angle = 0.0
 cols = st.columns([1.2, 1, 1, 0.8, 1.2, 1, 1])
 
 with cols[0]:
-    airfoil_family = st.selectbox("Airfoil Family", ["symmetric", "cambered", "biomimetic"], index=2)
+    airfoil_family = st.selectbox("Airfoil Family", ["symmetric", "cambered", "biomimetic"], index=0)
 with cols[1]:
     angle_of_attack = st.slider("AoA (°)", min_value=0.0, max_value=25.0, value=10.0, step=0.5)
 with cols[2]:

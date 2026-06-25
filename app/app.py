@@ -69,8 +69,18 @@ st.markdown(
         font-size: 0.92rem;
         opacity: 0.82;
     }
+    
+    /* Force the sidebar to be smaller */
     [data-testid="stSidebar"] {
         background-color: #eaf3fc;
+        min-width: 220px !important;
+        max-width: 220px !important;
+    }
+    
+    /* Condense the labels in the top input bar */
+    .condensed-label label {
+        font-size: 0.85rem !important;
+        margin-bottom: 0px !important;
     }
     </style>
     """,
@@ -87,12 +97,6 @@ def plot_airfoil_and_separation(
     separation_x_over_c: float,
     airfoil_family: str,
 ) -> plt.Figure:
-    """
-    Create a simple conceptual wing-section plot and mark the predicted
-    separation location along the normalized chord.
-
-    This is intentionally lightweight. It is not a CFD visualization.
-    """
     fig, ax = plt.subplots(figsize=(8, 3))
 
     ax.plot([0, 1], [0, 0], linewidth=4)
@@ -107,7 +111,6 @@ def plot_airfoil_and_separation(
         fontsize=11,
     )
 
-    # Simple leading/trailing edge labels for workshop readability.
     ax.text(0.0, -0.11, "Leading edge", ha="left", va="top", fontsize=9)
     ax.text(1.0, -0.11, "Trailing edge", ha="right", va="top", fontsize=9)
 
@@ -124,10 +127,6 @@ def plot_airfoil_and_separation(
 
 
 def sustainability_interpretation(separation_x_over_c: float) -> tuple[str, str]:
-    """
-    Provide a cautious, educational sustainability interpretation.
-    This does not claim direct carbon savings from the ML model.
-    """
     if separation_x_over_c >= 0.80:
         return (
             "Strong attached-flow indicator",
@@ -149,11 +148,6 @@ def build_sustainability_table(
     number_of_flights: int,
     carbon_factor_kg_per_kwh: float,
 ) -> pd.DataFrame:
-    """
-    Build a scenario table for classroom discussion. The percentages are not
-    produced by the ML model. They are what-if assumptions for comparing how
-    small efficiency gains can scale across many flights.
-    """
     scenarios = [2, 5, 10]
     rows = []
     total_energy_kwh = (energy_per_flight_wh * number_of_flights) / 1000.0
@@ -173,9 +167,6 @@ def build_sustainability_table(
 # -----------------------------------------------------------------------------
 # Welcome page
 # -----------------------------------------------------------------------------
-# A simple session-state gate: until the user clicks through, only the welcome
-# screen renders. st.stop() halts the script so the rest of the app (including
-# the sidebar inputs) is not drawn behind the welcome page.
 if "entered" not in st.session_state:
     st.session_state.entered = False
 
@@ -219,27 +210,67 @@ st.markdown(
 )
 
 # -----------------------------------------------------------------------------
+# Top Input Bar (Condensed Single Row)
+# -----------------------------------------------------------------------------
+st.markdown("---")
+# Wrapper to apply tighter margins/labels via our custom CSS
+st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
+
+root_chord = 1.0
+tip_chord = 1.0
+sweep_angle = 0.0
+
+# 7 columns for a highly condensed, single-bar layout
+cols = st.columns([1.2, 1, 1, 0.8, 1.2, 1, 1])
+
+with cols[0]:
+    airfoil_family = st.selectbox("Airfoil Family", ["symmetric", "cambered", "biomimetic"], index=2)
+with cols[1]:
+    angle_of_attack = st.slider("AoA (°)", min_value=0.0, max_value=25.0, value=10.0, step=0.5)
+with cols[2]:
+    airspeed = st.selectbox("Airspeed", [15, 30], index=1)
+with cols[3]:
+    st.markdown(
+        "<div style='font-size:0.8rem; margin-top:0.4rem; opacity:0.8;'><b>Fixed Geo:</b><br>"
+        f"Root: {root_chord}<br>Tip: {tip_chord}<br>Sweep: {sweep_angle}°</div>",
+        unsafe_allow_html=True
+    )
+
+if airfoil_family == "biomimetic":
+    with cols[4]:
+        tubercle_shape = st.selectbox("Tubercle Shape", ["whale", "biomimetic_v1"], index=0)
+    with cols[5]:
+        tubercle_amplitude = st.slider("Amplitude", min_value=26.2, max_value=32.7, value=26.2, step=0.1)
+    with cols[6]:
+        tubercle_wavelength = st.slider("Wavelength", min_value=42.3, max_value=49.6, value=49.6, step=0.1)
+else:
+    tubercle_shape = "none"
+    tubercle_amplitude = 0.0
+    tubercle_wavelength = 0.0
+
+st.markdown('</div>', unsafe_allow_html=True)
+st.markdown("---")
+
+input_dict = {
+    "airfoil_family": airfoil_family,
+    "tubercle_amplitude": tubercle_amplitude,
+    "tubercle_wavelength": tubercle_wavelength,
+    "tubercle_shape": tubercle_shape,
+    "root_chord": root_chord,
+    "tip_chord": tip_chord,
+    "sweep_angle": sweep_angle,
+    "angle_of_attack": angle_of_attack,
+    "airspeed": airspeed,
+}
+
+# -----------------------------------------------------------------------------
 # Sidebar Display Options
 # -----------------------------------------------------------------------------
 st.sidebar.header("Display Options")
-show_explanations = st.sidebar.toggle(
-    "Explanations",
-    value=True,
-    help="Show or hide the descriptive panels and expanders.",
-)
-show_prediction = st.sidebar.toggle(
-    "Model Prediction",
-    value=True,
-    help="Show or hide the Model Prediction section.",
-)
-show_sustainability = st.sidebar.toggle(
-    "Sustainability Lens",
-    value=True,
-    help="Show or hide the Sustainability Lens section.",
-)
+show_explanations = st.sidebar.toggle("Explanations", value=True)
+show_prediction = st.sidebar.toggle("Model Prediction", value=True)
+show_sustainability = st.sidebar.toggle("Sustainability Lens", value=True)
 
-# Initialize prediction state once, independent of which sections are visible,
-# so hiding the Model Prediction section never leaves the state undefined.
 if "latest_prediction" not in st.session_state:
     st.session_state.latest_prediction = None
 if "latest_input_dict" not in st.session_state:
@@ -247,6 +278,9 @@ if "latest_input_dict" not in st.session_state:
 if "latest_label" not in st.session_state:
     st.session_state.latest_label = None
 
+# -----------------------------------------------------------------------------
+# Explanations
+# -----------------------------------------------------------------------------
 if show_explanations:
     intro_col1, intro_col2, intro_col3 = st.columns(3)
     with intro_col1:
@@ -283,113 +317,11 @@ if show_explanations:
             """
         )
 
-# -----------------------------------------------------------------------------
-# Top Input Bar
-# -----------------------------------------------------------------------------
-st.markdown("---")
-st.subheader("Wing and Flow Inputs")
-st.caption("Adjust the sliders, then run the model to see how the predicted separation point responds.")
-
-# Fixed wing geometry definitions
-root_chord = 1.0
-tip_chord = 1.0
-sweep_angle = 0.0
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    airfoil_family = st.selectbox(
-        "Airfoil Family",
-        ["symmetric", "cambered", "biomimetic"],
-        index=2,
-        help="The broad wing type. Biomimetic wings use nature-inspired features such as tubercles.",
-    )
-with col2:
-    angle_of_attack = st.slider(
-        "Angle of Attack (degrees)",
-        min_value=0.0,
-        max_value=25.0,
-        value=10.0,
-        step=0.5,
-        help="The angle between the incoming airflow and the wing chord line.",
-    )
-with col3:
-    airspeed = st.selectbox(
-        "Airspeed",
-        [15, 30],
-        index=1,
-        help="The relative speed of airflow over the wing.",
-    )
-with col4:
-    st.markdown("**Fixed Wing Geometry**")
-    st.markdown(
-        f"<span class='small-note'>Root Chord: <b>{root_chord:.0f}</b><br>"
-        f"Tip Chord: <b>{tip_chord:.0f}</b><br>"
-        f"Sweep Angle: <b>{sweep_angle:.0f}°</b></span>",
-        unsafe_allow_html=True
-    )
-
-# Tubercle controls only apply to biomimetic wings. Rendering them conditionally
-if airfoil_family == "biomimetic":
-    st.markdown("**Tubercle Geometry**")
-    bio_col1, bio_col2, bio_col3 = st.columns(3)
-    with bio_col1:
-        tubercle_shape = st.selectbox(
-            "Tubercle Shape",
-            ["whale", "biomimetic_v1"],
-            index=0,
-            help="The tubercle pattern used for biomimetic wings.",
-        )
-    with bio_col2:
-        tubercle_amplitude = st.slider(
-            "Tubercle Amplitude",
-            min_value=26.247,
-            max_value=32.734,
-            value=26.247,
-            step=0.1,
-            help="How tall the tubercle bumps are.",
-        )
-    with bio_col3:
-        tubercle_wavelength = st.slider(
-            "Tubercle Wavelength",
-            min_value=42.337,
-            max_value=49.607,
-            value=49.607,
-            step=0.1,
-            help="The spacing between tubercle peaks.",
-        )
-else:
-    tubercle_shape = "none"
-    tubercle_amplitude = 0.0
-    tubercle_wavelength = 0.0
-    st.caption("Tubercle controls are hidden because a non-biomimetic airfoil family is selected.")
-
-input_dict = {
-    "airfoil_family": airfoil_family,
-    "tubercle_amplitude": tubercle_amplitude,
-    "tubercle_wavelength": tubercle_wavelength,
-    "tubercle_shape": tubercle_shape,
-    "root_chord": root_chord,
-    "tip_chord": tip_chord,
-    "sweep_angle": sweep_angle,
-    "angle_of_attack": angle_of_attack,
-    "airspeed": airspeed,
-}
-
-st.markdown("---")
-
-# -----------------------------------------------------------------------------
-# Diagnostics
-# -----------------------------------------------------------------------------
-if show_explanations:
     with st.expander("Model and input diagnostics"):
         st.write("Current input dictionary:")
         st.json(input_dict)
         st.write("Expected model feature order:")
         st.write(get_required_feature_columns())
-        st.caption(
-            "If prediction fails, first check that the model file in models/ has the same filename expected by src/inference.py."
-        )
 
 # -----------------------------------------------------------------------------
 # Prediction block
@@ -430,9 +362,6 @@ if show_prediction:
         metric_col2.metric("Flow interpretation", label)
         metric_col3.metric("Separation location", f"{prediction * 100:.1f}% chord")
 
-        # Plot geometry is read from the saved prediction inputs, not the live
-        # sliders, so changing a slider without re-running cannot desync the chart
-        # from the displayed prediction value.
         fig = plot_airfoil_and_separation(
             root_chord=saved["root_chord"],
             tip_chord=saved["tip_chord"],
@@ -448,7 +377,7 @@ if show_prediction:
         st.write("Prediction record")
         st.dataframe(output_df, use_container_width=True)
     else:
-        st.info("Adjust the inputs in the Input Bar, then click **Run Prediction**.")
+        st.info("Adjust the inputs in the Input Bar above, then click **Run Prediction**.")
 
 # -----------------------------------------------------------------------------
 # Sustainability section
@@ -479,7 +408,6 @@ if show_sustainability:
             max_value=100000.0,
             value=100.0,
             step=10.0,
-            help="Example: a small drone flight might use tens to hundreds of watt-hours. Use a value appropriate for your scenario.",
         )
     with calc_col2:
         number_of_flights = st.number_input(
@@ -488,7 +416,6 @@ if show_sustainability:
             max_value=100000,
             value=100,
             step=10,
-            help="Use the number of flights in a season, school year, club project, or test campaign.",
         )
     with calc_col3:
         carbon_factor_kg_per_kwh = st.slider(
@@ -497,7 +424,6 @@ if show_sustainability:
             max_value=2.0,
             value=0.40,
             step=0.01,
-            help="Classroom placeholder. Update this value if you know the local electricity emissions factor.",
         )
 
     sustainability_df = build_sustainability_table(

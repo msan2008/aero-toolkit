@@ -56,7 +56,10 @@ st.markdown(
     .main .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
-        max-width: 1200px;
+        padding-left: 6rem;
+        padding-right: 6rem;
+        max-width: 1040px;
+        margin: 0 auto;
     }
     .info-card {
         padding: 1rem 1.15rem;
@@ -226,7 +229,7 @@ cols = st.columns([1.2, 1, 1, 0.8, 1.2, 1, 1])
 with cols[0]:
     airfoil_family = st.selectbox("Airfoil Family", ["symmetric", "cambered", "biomimetic"], index=0)
 with cols[1]:
-    angle_of_attack = st.slider("AoA (°)", min_value=0.0, max_value=25.0, value=10.0, step=0.5)
+    angle_of_attack = st.slider("AoA (°)", min_value=0.0, max_value=25.0, value=10.0, step=0.5, format="%.1f")
 with cols[2]:
     airspeed = st.selectbox("Airspeed", [15, 30], index=1)
 with cols[3]:
@@ -240,9 +243,9 @@ if airfoil_family == "biomimetic":
     with cols[4]:
         tubercle_shape = st.selectbox("Tubercle Shape", ["whale", "biomimetic_v1"], index=0)
     with cols[5]:
-        tubercle_amplitude = st.slider("Amplitude", min_value=26.2, max_value=32.7, value=26.2, step=0.1)
+        tubercle_amplitude = st.slider("Amplitude", min_value=26.2, max_value=32.7, value=26.2, step=0.1, format="%.1f")
     with cols[6]:
-        tubercle_wavelength = st.slider("Wavelength", min_value=42.3, max_value=49.6, value=49.6, step=0.1)
+        tubercle_wavelength = st.slider("Wavelength", min_value=42.3, max_value=49.6, value=49.6, step=0.1, format="%.1f")
 else:
     tubercle_shape = "none"
     tubercle_amplitude = 0.0

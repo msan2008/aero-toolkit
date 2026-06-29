@@ -56,7 +56,7 @@ st.markdown(
     .main .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
-        padding-left: 6rem;
+        padding-left: 9rem;
         padding-right: 6rem;
         max-width: 1040px;
         margin: 0 auto;
@@ -75,7 +75,7 @@ st.markdown(
     
     /* Force the sidebar to be smaller */
     [data-testid="stSidebar"] {
-        background-color: #eaf3fc;
+        background-color: #fcebec;
         min-width: 220px !important;
         max-width: 220px !important;
     }
@@ -330,13 +330,13 @@ if show_explanations:
 # Prediction block
 # -----------------------------------------------------------------------------
 if show_prediction:
-    st.subheader("Model Prediction")
-
-    run_col, note_col = st.columns([1, 3])
+    title_col, run_col = st.columns([3, 1])
+    with title_col:
+        st.subheader("Model Prediction")
     with run_col:
         run_clicked = st.button("Run Prediction", type="primary", use_container_width=True)
-    with note_col:
-        st.caption("A later separation point, closer to x/c = 1, generally indicates more attached flow in this simplified screening context.")
+
+    st.caption("A later separation point, closer to x/c = 1, generally indicates more attached flow in this simplified screening context.")
 
     if run_clicked:
         try:

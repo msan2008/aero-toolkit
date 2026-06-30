@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -302,7 +303,7 @@ with st.form("input_form"):
 
     st.markdown('</div>', unsafe_allow_html=True)
     st.caption("Slider inputs are intentionally kept within training range")
-    submitted = st.form_submit_button("Update inputs", type="primary")
+    submitted = st.form_submit_button("Run Prediction", type="primary")
 
 st.markdown("---")
 
@@ -401,6 +402,9 @@ if "latest_input_dict" not in st.session_state:
     st.session_state.latest_input_dict = None
 if "latest_label" not in st.session_state:
     st.session_state.latest_label = None
+if "prediction_history" not in st.session_state:
+    # Accumulates one record per successful run (inputs + prediction).
+    st.session_state.prediction_history = []
 
 # -----------------------------------------------------------------------------
 # Explanations
@@ -473,21 +477,27 @@ if show_explanations:
 # Prediction block
 # -----------------------------------------------------------------------------
 if show_prediction:
-    title_col, run_col = st.columns([3, 1])
-    with title_col:
-        st.subheader("Model Prediction")
-    with run_col:
-        run_clicked = st.button("Run Prediction", type="primary", use_container_width=True)
+    st.subheader("Model Prediction")
 
     st.caption("A later separation point, closer to x/c = 1, generally indicates more attached flow in this simplified screening context.")
 
-    if run_clicked:
+    if submitted:
         try:
             prediction = float(predict_from_dict(input_dict))
             label = describe_prediction(prediction)
             st.session_state.latest_prediction = prediction
             st.session_state.latest_input_dict = dict(input_dict)
             st.session_state.latest_label = label
+
+            # Append this run to the session history (most recent stays latest).
+            record = {
+                "run": len(st.session_state.prediction_history) + 1,
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                **dict(input_dict),
+                "predicted_separation_x_over_c": round(prediction, 4),
+                "flow_interpretation": label,
+            }
+            st.session_state.prediction_history.append(record)
         except Exception as e:
             st.session_state.latest_prediction = None
             st.session_state.latest_input_dict = None
@@ -530,18 +540,28 @@ if show_prediction:
         st.pyplot(fig)
         plt.close(fig)
 
-        output_df = pd.DataFrame([saved])
-        output_df["predicted_separation_x_over_c"] = prediction
-        st.write("Prediction record")
-        st.dataframe(output_df, use_container_width=True)
+    # Full run history (every prediction made this session), shown independently
+    # of the latest-run panel so it persists even after a failed run.
+    if st.session_state.prediction_history:
+        history_df = pd.DataFrame(st.session_state.prediction_history)
+
+        record_header_col, clear_col = st.columns([3, 1])
+        with record_header_col:
+            st.write(f"Prediction record — all runs this session ({len(history_df)})")
+        with clear_col:
+            if st.button("Clear history", use_container_width=True):
+                st.session_state.prediction_history = []
+                st.rerun()
+
+        st.dataframe(history_df, use_container_width=True)
 
         st.download_button(
-            "Download prediction record (CSV)",
-            data=output_df.to_csv(index=False).encode("utf-8"),
-            file_name="aero_toolkit_prediction.csv",
+            "Download all prediction records (CSV)",
+            data=history_df.to_csv(index=False).encode("utf-8"),
+            file_name="aero_toolkit_predictions.csv",
             mime="text/csv",
         )
-    else:
+    elif st.session_state.latest_prediction is None:
         st.info("Adjust the inputs in the Input Bar above, then click **Run Prediction**.")
 
 # -----------------------------------------------------------------------------

@@ -72,14 +72,14 @@ st.markdown(
         font-size: 0.92rem;
         opacity: 0.82;
     }
-    
+
     /* Force the sidebar to be smaller */
     [data-testid="stSidebar"] {
         background-color: #fcebec;
         min-width: 220px !important;
         max-width: 220px !important;
     }
-    
+
     /* Condense the labels in the top input bar */
     .condensed-label label {
         font-size: 0.85rem !important;
@@ -93,6 +93,21 @@ st.markdown(
 # -----------------------------------------------------------------------------
 # Helper functions
 # -----------------------------------------------------------------------------
+def get_model_r2() -> float | None:
+    """Return the trained model's R^2 score if the inference layer exposes one.
+
+    This tries to read the value from src/inference.py so the displayed score
+    stays in sync with the saved model. If no getter is available yet, it
+    returns None and the UI shows "N/A" instead of crashing.
+    """
+    try:
+        from src.inference import get_model_r2_score  # type: ignore  # noqa: E402
+
+        return float(get_model_r2_score())
+    except Exception:
+        return None
+
+
 def plot_airfoil_and_separation(
     root_chord: float,
     tip_chord: float,
@@ -108,7 +123,7 @@ def plot_airfoil_and_separation(
     ax.text(
         separation_x_over_c,
         0.08,
-        f"x/c = {separation_x_over_c:.3f}",
+        f"x/c = {separation_x_over_c:.2f}",
         ha="center",
         va="bottom",
         fontsize=11,
@@ -121,10 +136,7 @@ def plot_airfoil_and_separation(
     ax.set_ylim(-0.25, 0.35)
     ax.set_xlabel("Normalized chord location (x/c)")
     ax.set_yticks([])
-    ax.set_title(
-        f"Predicted Flow Separation Location | {airfoil_family.title()} Wing | "
-        f"Root={root_chord:.2f}, Tip={tip_chord:.2f}, Sweep={sweep_angle:.1f}°"
-    )
+    ax.set_title("Predicted Flow Separation Location")
     ax.grid(True, axis="x", alpha=0.3)
     return fig
 
@@ -213,45 +225,53 @@ st.markdown(
 )
 
 # -----------------------------------------------------------------------------
-# Top Input Bar (Condensed Single Row)
+# Top Input Bar (Condensed Single Row, batched inside a form)
 # -----------------------------------------------------------------------------
 st.markdown("---")
-# Wrapper to apply tighter margins/labels via our custom CSS
-st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
 
 root_chord = 1.0
 tip_chord = 1.0
 sweep_angle = 0.0
 
-# 7 columns for a highly condensed, single-bar layout
-cols = st.columns([1.2, 1, 1, 0.8, 1.2, 1, 1])
+# Wrapping the controls in a form means widget changes (especially dragging the
+# AoA slider) no longer trigger a rerun on every interaction. The script only
+# reruns when the user clicks the submit button below.
+with st.form("input_form"):
+    # Wrapper to apply tighter margins/labels via our custom CSS
+    st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
 
-with cols[0]:
-    airfoil_family = st.selectbox("Airfoil Family", ["symmetric", "cambered", "biomimetic"], index=0)
-with cols[1]:
-    angle_of_attack = st.slider("AoA (°)", min_value=0.0, max_value=25.0, value=10.0, step=0.5, format="%.1f")
-with cols[2]:
-    airspeed = st.selectbox("Airspeed", [15, 30], index=1)
-with cols[3]:
-    st.markdown(
-        "<div style='font-size:0.8rem; margin-top:0.4rem; opacity:0.8;'><b>Fixed Geo:</b><br>"
-        f"Root: {root_chord}<br>Tip: {tip_chord}<br>Sweep: {sweep_angle}°</div>",
-        unsafe_allow_html=True
-    )
+    # 7 columns for a highly condensed, single-bar layout
+    cols = st.columns([1.2, 1, 1, 0.8, 1.2, 1, 1])
 
-if airfoil_family == "biomimetic":
-    with cols[4]:
-        tubercle_shape = st.selectbox("Tubercle Shape", ["whale", "biomimetic_v1"], index=0)
-    with cols[5]:
-        tubercle_amplitude = st.slider("Amplitude", min_value=26.2, max_value=32.7, value=26.2, step=0.1, format="%.1f")
-    with cols[6]:
-        tubercle_wavelength = st.slider("Wavelength", min_value=42.3, max_value=49.6, value=49.6, step=0.1, format="%.1f")
-else:
-    tubercle_shape = "none"
-    tubercle_amplitude = 0.0
-    tubercle_wavelength = 0.0
+    with cols[0]:
+        airfoil_family = st.selectbox("Airfoil Family", ["symmetric", "cambered", "biomimetic"], index=0)
+    with cols[1]:
+        angle_of_attack = st.slider("AoA (°)", min_value=0.0, max_value=25.0, value=10.0, step=0.5, format="%.1f")
+    with cols[2]:
+        airspeed = st.selectbox("Airspeed", [15, 30], index=1)
+    with cols[3]:
+        st.markdown(
+            "<div style='font-size:0.8rem; margin-top:0.4rem; opacity:0.8;'>"
+            "The sweep angle, root chord, and tip chord are fixed</div>",
+            unsafe_allow_html=True,
+        )
 
-st.markdown('</div>', unsafe_allow_html=True)
+    if airfoil_family == "biomimetic":
+        with cols[4]:
+            tubercle_shape = st.selectbox("Tubercle Shape", ["whale", "biomimetic_v1"], index=0)
+        with cols[5]:
+            tubercle_amplitude = st.slider("Amplitude", min_value=26.2, max_value=32.7, value=26.2, step=0.1, format="%.1f")
+        with cols[6]:
+            tubercle_wavelength = st.slider("Wavelength", min_value=42.3, max_value=49.6, value=49.6, step=0.1, format="%.1f")
+    else:
+        tubercle_shape = "none"
+        tubercle_amplitude = 0.0
+        tubercle_wavelength = 0.0
+
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.caption("Slider inputs are intentionally kept within training range")
+    submitted = st.form_submit_button("Update inputs", type="primary")
+
 st.markdown("---")
 
 input_dict = {
@@ -359,11 +379,14 @@ if show_prediction:
         prediction = st.session_state.latest_prediction
         label = st.session_state.latest_label
         saved = st.session_state.latest_input_dict
+        r2_value = get_model_r2()
 
-        metric_col1, metric_col2, metric_col3 = st.columns(3)
-        metric_col1.metric("Predicted separation_x_over_c", f"{prediction:.4f}")
-        metric_col2.metric("Flow interpretation", label)
-        metric_col3.metric("Separation location", f"{prediction * 100:.1f}% chord")
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        m_col1.metric("Predicted separation_x_over_c", f"{prediction:.2f}")
+        m_col1.caption("This is a screening estimate, not a measured value")
+        m_col2.metric("Model R²", f"{r2_value:.3f}" if r2_value is not None else "N/A")
+        m_col3.metric("Flow interpretation", label)
+        m_col4.metric("Separation location", f"{prediction * 100:.1f}% chord")
 
         fig = plot_airfoil_and_separation(
             root_chord=saved["root_chord"],

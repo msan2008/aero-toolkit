@@ -36,13 +36,21 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap');
+
+    /* Base size bumped from the 16px default to 19px (+3pt). Because Streamlit
+       sizes most text in rem, this scales the whole type hierarchy up together
+       while preserving the relative sizes of headings vs. body text. */
+    html { font-size: 19px; }
+
     html, body, [class*="css"], .stApp,
     .stMarkdown, .stText,
     h1, h2, h3, h4, h5, h6, p, span, label, div,
     button, input, select, textarea,
     [data-testid="stMetricValue"],
     [data-testid="stMetricLabel"] {
-        font-family: 'Marcellus', 'Optima', 'Candara', serif !important;
+        font-family: 'Google Sans Flex', 'Roboto Flex', 'Roboto', system-ui, sans-serif !important;
+        color: #000000 !important;
     }
 
     [data-testid="stIconMaterial"],
@@ -173,7 +181,7 @@ def build_sustainability_table(
             {
                 "Assumed efficiency improvement": f"{efficiency_gain_percent}%",
                 "Estimated energy saved (kWh)": round(saved_kwh, 3),
-                "Estimated CO₂ avoided (kg)": round(avoided_kg_co2, 3),
+                "Hypothetical CO₂ avoided (kg)": round(avoided_kg_co2, 3),
             }
         )
     return pd.DataFrame(rows)
@@ -381,12 +389,20 @@ if show_prediction:
         saved = st.session_state.latest_input_dict
         r2_value = get_model_r2()
 
-        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("Predicted separation_x_over_c", f"{prediction:.2f}")
         m_col1.caption("This is a screening estimate, not a measured value")
         m_col2.metric("Model R²", f"{r2_value:.3f}" if r2_value is not None else "N/A")
-        m_col3.metric("Flow interpretation", label)
-        m_col4.metric("Separation location", f"{prediction * 100:.1f}% chord")
+        m_col3.metric("Separation location", f"{prediction * 100:.1f}% chord")
+
+        # A sentence-style interpretation reads better as a colored callout than
+        # as a metric (which is meant for short numeric values).
+        if prediction >= 0.80:
+            st.success(f"**Flow interpretation:** {label}")
+        elif prediction >= 0.60:
+            st.info(f"**Flow interpretation:** {label}")
+        else:
+            st.warning(f"**Flow interpretation:** {label}")
 
         fig = plot_airfoil_and_separation(
             root_chord=saved["root_chord"],
@@ -402,6 +418,13 @@ if show_prediction:
         output_df["predicted_separation_x_over_c"] = prediction
         st.write("Prediction record")
         st.dataframe(output_df, use_container_width=True)
+
+        st.download_button(
+            "Download prediction record (CSV)",
+            data=output_df.to_csv(index=False).encode("utf-8"),
+            file_name="aero_toolkit_prediction.csv",
+            mime="text/csv",
+        )
     else:
         st.info("Adjust the inputs in the Input Bar above, then click **Run Prediction**.")
 
@@ -424,7 +447,7 @@ if show_sustainability:
         st.markdown(f"**Prediction-based design note:** {sustain_label}")
         st.write(sustain_text)
     else:
-        st.caption("Run a prediction first to connect the sustainability discussion to the selected wing design.")
+        st.info("Run a prediction first to connect this sustainability discussion to your selected wing design.")
 
     calc_col1, calc_col2, calc_col3 = st.columns(3)
     with calc_col1:

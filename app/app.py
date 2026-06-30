@@ -320,6 +320,7 @@ st.sidebar.header("Display Options")
 show_explanations = st.sidebar.toggle("Explanations", value=False)
 show_prediction = st.sidebar.toggle("Model Prediction", value=True)
 show_sustainability = st.sidebar.toggle("Sustainability Lens", value=False)
+show_about = st.sidebar.toggle("About", value=False)
 dark_mode = st.sidebar.toggle("Dark Mode", value=False)
 
 # Inject dark-theme overrides. This is rendered after the base style block, so
@@ -602,3 +603,28 @@ st.caption(
     "Prototype note: this is a lightweight ML screening tool connected to a saved notebook-trained model artifact. "
     "It should be used for exploration and education, not as a replacement for CFD, wind-tunnel testing, or professional aerodynamic design."
 )
+
+# -----------------------------------------------------------------------------
+# About section (toggled from the sidebar)
+# -----------------------------------------------------------------------------
+if show_about:
+    st.markdown("---")
+
+    st.header("About the Tool")
+    st.write(
+        "This toolkit is meant to be a screening tool to help students and enthusiasts "
+        "test potential aerofoil designs before moving onto expensive and time consuming "
+        "CFD and physical testing. It is an educational tool meant to educate the public "
+        "about biomimetic wings and their applications in improving aerodynamic efficiency "
+        "and the environmental impact of the aviation industry. The software for this "
+        "toolkit can be found in the Github repository."
+    )
+
+    st.header("About the Creator")
+    st.write(
+        "This toolkit was created by Madhav S Anoop, a rising senior at Round Rock High "
+        "School in Austin, Texas. Since he was little, Madhav has been passionate in "
+        "aerospace engineering, physics, and mathematics. His research involves designing "
+        "and testing biomimetic wings that reduce aerodynamic drag. He intends to continue "
+        "his research and pursue his passion as an aerospace engineer."
+    )

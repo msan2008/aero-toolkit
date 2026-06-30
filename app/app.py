@@ -123,12 +123,26 @@ def plot_airfoil_and_separation(
     sweep_angle: float,
     separation_x_over_c: float,
     airfoil_family: str,
+    dark_mode: bool = False,
 ) -> plt.Figure:
-    fig, ax = plt.subplots(figsize=(8, 3))
+    if dark_mode:
+        bg_color = "#0e1117"
+        fg_color = "#e6e6e6"
+        line_color = "#5aa9e6"
+        marker_color = "#ff7b72"
+    else:
+        bg_color = "white"
+        fg_color = "black"
+        line_color = None  # use matplotlib defaults to keep light mode unchanged
+        marker_color = None
 
-    ax.plot([0, 1], [0, 0], linewidth=4)
-    ax.scatter([separation_x_over_c], [0], s=120, zorder=3)
-    ax.axvline(separation_x_over_c, linestyle="--", linewidth=1.5)
+    fig, ax = plt.subplots(figsize=(8, 3))
+    fig.patch.set_facecolor(bg_color)
+    ax.set_facecolor(bg_color)
+
+    ax.plot([0, 1], [0, 0], linewidth=4, color=line_color)
+    ax.scatter([separation_x_over_c], [0], s=120, zorder=3, color=marker_color)
+    ax.axvline(separation_x_over_c, linestyle="--", linewidth=1.5, color=marker_color)
     ax.text(
         separation_x_over_c,
         0.08,
@@ -136,16 +150,20 @@ def plot_airfoil_and_separation(
         ha="center",
         va="bottom",
         fontsize=11,
+        color=fg_color,
     )
 
-    ax.text(0.0, -0.11, "Leading edge", ha="left", va="top", fontsize=9)
-    ax.text(1.0, -0.11, "Trailing edge", ha="right", va="top", fontsize=9)
+    ax.text(0.0, -0.11, "Leading edge", ha="left", va="top", fontsize=9, color=fg_color)
+    ax.text(1.0, -0.11, "Trailing edge", ha="right", va="top", fontsize=9, color=fg_color)
 
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.25, 0.35)
-    ax.set_xlabel("Normalized chord location (x/c)")
+    ax.set_xlabel("Normalized chord location (x/c)", color=fg_color)
     ax.set_yticks([])
-    ax.set_title("Predicted Flow Separation Location")
+    ax.set_title("Predicted Flow Separation Location", color=fg_color)
+    ax.tick_params(axis="x", colors=fg_color)
+    for spine in ax.spines.values():
+        spine.set_color(fg_color)
     ax.grid(True, axis="x", alpha=0.3)
     return fig
 
@@ -302,6 +320,74 @@ st.sidebar.header("Display Options")
 show_explanations = st.sidebar.toggle("Explanations", value=False)
 show_prediction = st.sidebar.toggle("Model Prediction", value=True)
 show_sustainability = st.sidebar.toggle("Sustainability Lens", value=False)
+dark_mode = st.sidebar.toggle("Dark Mode", value=False)
+
+# Inject dark-theme overrides. This is rendered after the base style block, so
+# its rules win the cascade for the selectors they share.
+if dark_mode:
+    st.markdown(
+        """
+        <style>
+        /* ---- Aero Toolkit dark mode ---- */
+        .stApp, [data-testid="stAppViewContainer"] {
+            background-color: #0e1117 !important;
+        }
+        [data-testid="stHeader"] {
+            background-color: rgba(14, 17, 23, 0) !important;
+        }
+
+        /* Light text overrides the forced-black base rule */
+        html, body, [class*="css"], .stApp,
+        .stMarkdown, .stText,
+        h1, h2, h3, h4, h5, h6, p, span, label, div,
+        button, input, select, textarea,
+        [data-testid="stMetricValue"],
+        [data-testid="stMetricLabel"] {
+            color: #e6e6e6 !important;
+        }
+
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background-color: #1a1c22 !important;
+        }
+
+        /* Info cards */
+        .info-card {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+
+        /* Inputs / select boxes */
+        input, textarea,
+        [data-baseweb="input"] > div,
+        [data-baseweb="select"] > div,
+        [data-baseweb="base-input"] {
+            background-color: #262730 !important;
+            color: #e6e6e6 !important;
+        }
+
+        /* JSON / code surfaces */
+        [data-testid="stJson"], pre, code {
+            background-color: #1c1f26 !important;
+        }
+
+        /* Alerts (info / success / warning) made readable on dark */
+        [data-testid="stAlert"], .stAlert {
+            background-color: rgba(255, 255, 255, 0.07) !important;
+        }
+
+        /* Expander */
+        [data-testid="stExpander"] details {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        }
+
+        /* Dividers */
+        hr { border-color: rgba(255, 255, 255, 0.15) !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 if "latest_prediction" not in st.session_state:
     st.session_state.latest_prediction = None
@@ -354,6 +440,28 @@ if show_explanations:
         st.json(input_dict)
         st.write("Expected model feature order:")
         st.write(get_required_feature_columns())
+
+        st.write("R² diagnostics:")
+        try:
+            from src.inference import get_model_r2_score  # noqa: E402
+
+            raw_r2 = get_model_r2_score()
+            st.write({"get_model_r2_score() returned": raw_r2})
+            if raw_r2 is None:
+                st.warning(
+                    "The function imported fine but returned None. No metrics file was found "
+                    "and DEFAULT_MODEL_R2 is not set. Add models/metrics.json (e.g. {\"r2\": 0.93}) "
+                    "or set DEFAULT_MODEL_R2 in src/inference.py to display a value."
+                )
+            else:
+                st.success("R² is being read correctly and will display next to the prediction.")
+        except Exception as e:
+            st.error(f"Could not import get_model_r2_score from src.inference: {e!r}")
+            st.info(
+                "This means the app is not importing the updated src/inference.py. Confirm the new "
+                "inference.py actually replaced the file at <project>/src/inference.py, then fully "
+                "restart Streamlit (editing it while running is often not enough)."
+            )
 
 # -----------------------------------------------------------------------------
 # Prediction block
@@ -411,6 +519,7 @@ if show_prediction:
             sweep_angle=saved["sweep_angle"],
             separation_x_over_c=prediction,
             airfoil_family=saved["airfoil_family"],
+            dark_mode=dark_mode,
         )
         st.pyplot(fig)
         plt.close(fig)

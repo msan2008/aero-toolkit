@@ -36,7 +36,7 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
     /* Base size bumped from the 16px default to 19px (+3pt). Because Streamlit
        sizes most text in rem, this scales the whole type hierarchy up together
@@ -49,7 +49,7 @@ st.markdown(
     button, input, select, textarea,
     [data-testid="stMetricValue"],
     [data-testid="stMetricLabel"] {
-        font-family: 'Google Sans Flex', 'Roboto Flex', 'Roboto', system-ui, sans-serif !important;
+        font-family: 'Poppins', system-ui, sans-serif !important;
         color: #000000 !important;
     }
 
@@ -105,13 +105,14 @@ def get_model_r2() -> float | None:
     """Return the trained model's R^2 score if the inference layer exposes one.
 
     This tries to read the value from src/inference.py so the displayed score
-    stays in sync with the saved model. If no getter is available yet, it
-    returns None and the UI shows "N/A" instead of crashing.
+    stays in sync with the saved model. If no score is available, it returns
+    None and the UI shows "N/A" instead of crashing.
     """
     try:
         from src.inference import get_model_r2_score  # type: ignore  # noqa: E402
 
-        return float(get_model_r2_score())
+        score = get_model_r2_score()
+        return float(score) if score is not None else None
     except Exception:
         return None
 

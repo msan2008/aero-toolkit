@@ -275,7 +275,12 @@ with st.form("input_form"):
     with cols[1]:
         angle_of_attack = st.slider("AoA (°)", min_value=0.0, max_value=25.0, value=10.0, step=0.5, format="%.1f")
     with cols[2]:
-        airspeed = st.selectbox("Airspeed", [15, 30], index=1)
+        airspeed = st.selectbox(
+            "Airspeed (m/s)",
+            [15, 30],
+            index=1,
+            format_func=lambda v: f"{v} m/s",
+        )
     with cols[3]:
         st.markdown(
             "<div style='font-size:0.8rem; margin-top:0.4rem; opacity:0.8;'>"
@@ -287,9 +292,9 @@ with st.form("input_form"):
         with cols[4]:
             tubercle_shape = st.selectbox("Tubercle Shape", ["whale", "biomimetic_v1"], index=0)
         with cols[5]:
-            tubercle_amplitude = st.slider("Amplitude", min_value=26.2, max_value=32.7, value=26.2, step=0.1, format="%.1f")
+            tubercle_amplitude = st.slider("Amplitude (mm)", min_value=26.2, max_value=32.7, value=26.2, step=0.1, format="%.1f mm")
         with cols[6]:
-            tubercle_wavelength = st.slider("Wavelength", min_value=42.3, max_value=49.6, value=49.6, step=0.1, format="%.1f")
+            tubercle_wavelength = st.slider("Wavelength (mm)", min_value=42.3, max_value=49.6, value=49.6, step=0.1, format="%.1f mm")
     else:
         tubercle_shape = "none"
         tubercle_amplitude = 0.0
@@ -626,5 +631,5 @@ if show_about:
         "School in Austin, Texas. Since he was little, Madhav has been passionate in "
         "aerospace engineering, physics, and mathematics. His research involves designing "
         "and testing biomimetic wings that reduce aerodynamic drag. He intends to continue "
-        "his research and pursue his passion as an aerospace engineer. Feel free to contact him at madhav.anoop2027@gmail.com or at his LinkedIn www.linkedin.com/in/madhav-s-anoop"
+        "his research and pursue his passion as an aerospace engineer."
     )

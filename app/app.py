@@ -626,5 +626,5 @@ if show_about:
         "School in Austin, Texas. Since he was little, Madhav has been passionate in "
         "aerospace engineering, physics, and mathematics. His research involves designing "
         "and testing biomimetic wings that reduce aerodynamic drag. He intends to continue "
-        "his research and pursue his passion as an aerospace engineer."
+        "his research and pursue his passion as an aerospace engineer. Feel free to contact him at madhav.anoop2027@gmail.com or at his LinkedIn www.linkedin.com/in/madhav-s-anoop"
     )

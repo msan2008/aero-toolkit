@@ -8,6 +8,7 @@ and app/app.py.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -45,6 +46,28 @@ REQUIRED_FEATURE_COLUMNS = [
     "angle_of_attack",
     "airspeed",
 ]
+
+# -----------------------------------------------------------------------------
+# Model evaluation metric (R^2)
+# -----------------------------------------------------------------------------
+# The held-out R^2 is computed at *training* time and is NOT stored inside the
+# saved estimator, so it has to be supplied to the app separately. Two options:
+#   1) (recommended) Have Notebook 2 write a metrics file next to the model, e.g.
+#          models/metrics.json -> {"r2": 0.93}
+#      or, if you keep several models around, key it by filename:
+#          {"production_model.joblib": {"r2": 0.93}}
+#   2) Paste the number into DEFAULT_MODEL_R2 below for a quick hard-coded value.
+METRICS_CANDIDATES = [
+    MODELS_DIR / "metrics.json",
+    MODELS_DIR / "model_metrics.json",
+    MODELS_DIR / "notebook2_metrics.json",
+]
+
+# Quick fallback if you don't want to manage a metrics file. Set to e.g. 0.93.
+DEFAULT_MODEL_R2: float | None = None
+
+# Accepted JSON keys for the R^2 value, in priority order.
+_R2_KEYS = ("r2", "test_r2", "r2_score", "R2", "r_squared")
 
 _CACHED_MODEL: Any | None = None
 _CACHED_MODEL_PATH: Path | None = None
@@ -92,6 +115,58 @@ def get_loaded_model_path() -> str:
     return str(find_model_path())
 
 
+def _read_metrics_file() -> Dict[str, Any]:
+    """Return the contents of the first readable metrics JSON, or {} if none."""
+    for candidate in METRICS_CANDIDATES:
+        if candidate.exists():
+            try:
+                with candidate.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+                if isinstance(data, dict):
+                    return data
+            except (json.JSONDecodeError, OSError):
+                continue
+    return {}
+
+
+def get_model_r2_score() -> float | None:
+    """Return the trained model's held-out R^2 score, or None if unknown.
+
+    Resolution order:
+      1) a metrics JSON in models/ keyed by the selected model filename
+         (e.g. {"production_model.joblib": {"r2": 0.93}});
+      2) a top-level value in that same JSON (e.g. {"r2": 0.93});
+      3) the DEFAULT_MODEL_R2 constant above;
+      4) None.
+
+    Returning None lets the app display "N/A" rather than a fabricated number.
+    """
+    metrics = _read_metrics_file()
+
+    try:
+        model_name: str | None = Path(get_loaded_model_path()).name
+    except Exception:
+        model_name = None
+
+    # Sources to inspect, most specific first.
+    sources: List[Any] = []
+    if model_name and isinstance(metrics.get(model_name), dict):
+        sources.append(metrics[model_name])
+    sources.append(metrics)  # allow a flat {"r2": 0.93}
+
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        for key in _R2_KEYS:
+            if key in source:
+                try:
+                    return float(source[key])
+                except (TypeError, ValueError):
+                    pass
+
+    return DEFAULT_MODEL_R2
+
+
 def validate_input(input_dict: Dict[str, Any]) -> None:
     """Check that the app provided every feature required by the model."""
     missing = [column for column in REQUIRED_FEATURE_COLUMNS if column not in input_dict]
@@ -133,3 +208,4 @@ if __name__ == "__main__":
     print("Models directory:", MODELS_DIR)
     print("Available model files:", _available_joblib_files())
     print("Selected model:", find_model_path())
+    print("Model R^2:", get_model_r2_score())

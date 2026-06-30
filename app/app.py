@@ -302,7 +302,7 @@ with st.form("input_form"):
 
     st.markdown('</div>', unsafe_allow_html=True)
     st.caption("Slider inputs are intentionally kept within training range")
-    submitted = st.form_submit_button("Run Prediction", type="primary")
+    submitted = st.form_submit_button("Update inputs", type="primary")
 
 st.markdown("---")
 
@@ -473,11 +473,15 @@ if show_explanations:
 # Prediction block
 # -----------------------------------------------------------------------------
 if show_prediction:
-    st.subheader("Model Prediction")
+    title_col, run_col = st.columns([3, 1])
+    with title_col:
+        st.subheader("Model Prediction")
+    with run_col:
+        run_clicked = st.button("Run Prediction", type="primary", use_container_width=True)
 
     st.caption("A later separation point, closer to x/c = 1, generally indicates more attached flow in this simplified screening context.")
 
-    if submitted:
+    if run_clicked:
         try:
             prediction = float(predict_from_dict(input_dict))
             label = describe_prediction(prediction)

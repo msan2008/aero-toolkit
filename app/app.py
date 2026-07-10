@@ -22,6 +22,17 @@ from src.inference import (  # noqa: E402
     predict_from_dict,
 )
 
+# predict_raw_from_dict() returns the UNCLIPPED model output, which is what lets
+# this app distinguish a genuine 1.0 from a clamped 1.4. It only exists in the
+# updated src/inference.py; if the app is run against an older copy, we fall
+# back to the clipped value and detect clipping from the boundary instead.
+try:
+    from src.inference import predict_raw_from_dict  # noqa: E402
+
+    HAS_RAW_PREDICTION = True
+except ImportError:
+    HAS_RAW_PREDICTION = False
+
 # -----------------------------------------------------------------------------
 # Theme accent (self-contained, no .streamlit/config.toml required)
 #
@@ -35,6 +46,10 @@ from src.inference import (  # noqa: E402
 ACCENT = "#3f6184"          # slate blue
 ACCENT_HOVER = "#34506d"
 TRACK_OFF = "#c8ccd4"       # unchecked toggle track (light mode)
+
+# How close to 0.0 or 1.0 counts as "sitting on the boundary" (i.e. probably
+# already clamped somewhere upstream) rather than a genuine interior prediction.
+CLIP_EPS = 1e-6
 
 
 def _apply_theme_options() -> None:
@@ -239,12 +254,66 @@ def get_model_r2() -> float | None:
         return None
 
 
+def evaluate_clipping(raw_prediction: float) -> tuple[float, str | None]:
+    """Clamp a model output to the physical range [0, 1] and report why.
+
+    `separation_x_over_c` is a normalized chord position, so values outside
+    [0, 1] are physically meaningless — a regressor is free to produce them
+    under extrapolation.
+
+    Returns (bounded_value, status). Status is None for a clean interior
+    prediction, otherwise:
+
+      "clamped_low"/"clamped_high"  : the raw output was outside [0, 1].
+      "at_lower_bound"/"at_upper_bound"
+          : the value is exactly on a boundary. When the raw output is
+            available this is a genuine saturated prediction; when it is not
+            (older src/inference.py, which clips internally), it means the
+            value was clamped upstream and the true output is unknown.
+    """
+    if raw_prediction < 0.0:
+        return 0.0, "clamped_low"
+    if raw_prediction > 1.0:
+        return 1.0, "clamped_high"
+    if raw_prediction <= CLIP_EPS:
+        return raw_prediction, "at_lower_bound"
+    if raw_prediction >= 1.0 - CLIP_EPS:
+        return raw_prediction, "at_upper_bound"
+    return raw_prediction, None
+
+
+def clipping_message(status: str, raw_prediction: float) -> str:
+    """Explain a clipping status in workshop-appropriate language."""
+    if status == "clamped_high":
+        return (
+            f"The model returned {raw_prediction:.3f}, which would place separation past the "
+            "trailing edge. It has been clamped to 1.00. Read this as "
+            "\"no separation predicted within the chord\" — the inputs pushed the model outside "
+            "the range it was trained on, so the number is not a precise result."
+        )
+    if status == "clamped_low":
+        return (
+            f"The model returned {raw_prediction:.3f}, which would place separation ahead of the "
+            "leading edge. It has been clamped to 0.00. Read this as "
+            "\"separation predicted immediately\" — the inputs pushed the model outside the range "
+            "it was trained on, so the number is not a precise result."
+        )
+
+    edge = "upper bound (x/c = 1.00)" if status == "at_upper_bound" else "lower bound (x/c = 0.00)"
+    if HAS_RAW_PREDICTION:
+        return (
+            f"The prediction sits exactly on the {edge}. The model saturated at the edge of the "
+            "physical range, so treat this as a boundary case rather than a confident estimate."
+        )
+    return (
+        f"The prediction sits exactly on the {edge}. This build of src/inference.py clips before "
+        "the value reaches the interface, so the underlying model output is unknown and may lie "
+        "well past the edge. This is a boundary artifact, not a confident prediction."
+    )
+
+
 def plot_airfoil_and_separation(
-    root_chord: float,
-    tip_chord: float,
-    sweep_angle: float,
     separation_x_over_c: float,
-    airfoil_family: str,
     dark_mode: bool = False,
 ) -> plt.Figure:
     if dark_mode:
@@ -282,7 +351,7 @@ def plot_airfoil_and_separation(
     ax.set_ylim(-0.25, 0.35)
     ax.set_xlabel("Normalized chord location (x/c)", color=fg_color)
     ax.set_yticks([])
-    ax.set_title("Predicted Flow Separation Location", color=fg_color)
+    ax.set_title("Predicted Flow Separation Location Along Wing Chord", color=fg_color)
     ax.tick_params(axis="x", colors=fg_color)
     for spine in ax.spines.values():
         spine.set_color(fg_color)
@@ -393,7 +462,7 @@ PRESETS: dict[str, dict] = {
     "Symmetric baseline": {
         "airfoil_family": "symmetric",
         "angle_of_attack": 5.0,
-        "airspeed": 30,
+        "airspeed": 15,
         "tubercle_shape": "whale",
         "tubercle_amplitude": 26.2,
         "tubercle_wavelength": 49.6,
@@ -401,7 +470,7 @@ PRESETS: dict[str, dict] = {
     "Cambered baseline": {
         "airfoil_family": "cambered",
         "angle_of_attack": 5.0,
-        "airspeed": 30,
+        "airspeed": 15,
         "tubercle_shape": "whale",
         "tubercle_amplitude": 26.2,
         "tubercle_wavelength": 49.6,
@@ -414,12 +483,13 @@ PRESETS: dict[str, dict] = {
         "tubercle_amplitude": 26.2,
         "tubercle_wavelength": 49.6,
     },
-    # A deliberately harder case: high angle of attack at low airspeed, with
-    # tubercle geometry at the opposite corner of the training envelope.
-    # Good starting point for a "can you delay separation?" workshop exercise.
+    # A deliberately hard case: a plain symmetric section at a high angle of
+    # attack and low airspeed. Separation should be predicted early, giving
+    # workshop participants a design to improve — the intended move is to
+    # switch the family to biomimetic and tune the tubercle geometry.
     "Workshop challenge": {
-        "airfoil_family": "biomimetic",
-        "angle_of_attack": 16.0,
+        "airfoil_family": "symmetric",
+        "angle_of_attack": 20.0,
         "airspeed": 15,
         "tubercle_shape": "whale",
         "tubercle_amplitude": 32.7,
@@ -651,6 +721,11 @@ if "latest_input_dict" not in st.session_state:
     st.session_state.latest_input_dict = None
 if "latest_label" not in st.session_state:
     st.session_state.latest_label = None
+if "latest_clip_status" not in st.session_state:
+    # None = interior prediction; otherwise a string from evaluate_clipping().
+    st.session_state.latest_clip_status = None
+if "latest_raw_output" not in st.session_state:
+    st.session_state.latest_raw_output = None
 if "prediction_history" not in st.session_state:
     # Accumulates one record per successful run (inputs + prediction).
     st.session_state.prediction_history = []
@@ -736,8 +811,18 @@ if show_prediction:
             # interpretation, and the CSV export can never disagree. Two
             # decimals is the right precision for a screening estimate; 0.7421
             # implies a measurement accuracy this model does not have.
-            raw_prediction = float(predict_from_dict(input_dict))
-            prediction = round(raw_prediction, 2)
+            # Prefer the unclipped output so clipping can be reported honestly.
+            # The fallback path receives an already-clipped value, in which case
+            # only the boundary heuristic in evaluate_clipping() can detect it.
+            if HAS_RAW_PREDICTION:
+                model_output = float(predict_raw_from_dict(input_dict))
+            else:
+                model_output = float(predict_from_dict(input_dict))
+
+            # Clamp before rounding: a raw 1.4 must not round to 1.40 and be
+            # presented as if the model meant it.
+            bounded, clip_status = evaluate_clipping(model_output)
+            prediction = round(bounded, 2)
 
             # Label is derived from the rounded value so a prediction of 0.795
             # cannot display as "0.80" while carrying the sub-0.80 label.
@@ -745,6 +830,8 @@ if show_prediction:
             st.session_state.latest_prediction = prediction
             st.session_state.latest_input_dict = dict(input_dict)
             st.session_state.latest_label = label
+            st.session_state.latest_clip_status = clip_status
+            st.session_state.latest_raw_output = model_output
 
             # Append this run to the session history (most recent stays latest).
             record = {
@@ -753,6 +840,8 @@ if show_prediction:
                 "preset": st.session_state.active_preset,
                 **dict(input_dict),
                 "predicted_separation_x_over_c": prediction,
+                "raw_model_output": round(model_output, 4),
+                "clipped": clip_status is not None,
                 "flow_interpretation": label,
             }
             st.session_state.prediction_history.append(record)
@@ -760,6 +849,7 @@ if show_prediction:
             st.session_state.latest_prediction = None
             st.session_state.latest_input_dict = None
             st.session_state.latest_label = None
+            st.session_state.latest_clip_status = None
             st.error(f"Prediction failed: {e}")
             st.info(
                 "This is usually a model-file synchronization issue. Check that the saved .joblib model is present in the models/ folder, "
@@ -769,7 +859,8 @@ if show_prediction:
     if st.session_state.latest_prediction is not None:
         prediction = st.session_state.latest_prediction
         label = st.session_state.latest_label
-        saved = st.session_state.latest_input_dict
+        clip_status = st.session_state.latest_clip_status
+        raw_output = st.session_state.latest_raw_output
         r2_value = get_model_r2()
 
         m_col1, m_col2, m_col3 = st.columns(3)
@@ -779,9 +870,31 @@ if show_prediction:
         # Two decimals on x/c means one decimal here would be false precision.
         m_col3.metric("Separation location", f"{prediction * 100:.0f}% chord")
 
+        # Plain-language restatement of the number, directly beneath it.
+        st.write(
+            f"This means the model predicts separation about {prediction * 100:.0f}% of the way "
+            "from the leading edge to the trailing edge."
+        )
+
+        # A clipped value is a boundary artifact. Say so before the flow
+        # interpretation, so it is never read as a confident result.
+        if clip_status is not None:
+            st.warning(f"**Prediction clipped:** {clipping_message(clip_status, raw_output)}")
+        elif raw_output is not None and prediction in (0.0, 1.0):
+            # Interior value that merely *rounds* onto a bound (e.g. 0.997 -> 1.00).
+            # Without this note it would be indistinguishable from a clipped result.
+            st.caption(
+                f"Displayed as {prediction:.2f} by rounding; the model output was "
+                f"{raw_output:.3f}, inside the valid range. This is not a clipped value."
+            )
+
         # A sentence-style interpretation reads better as a colored callout than
-        # as a metric (which is meant for short numeric values).
-        if prediction >= 0.80:
+        # as a metric (which is meant for short numeric values). When the value
+        # was clipped, the confident green/blue styling would be misleading, so
+        # the interpretation is downgraded to a warning callout.
+        if clip_status is not None:
+            st.warning(f"**Flow interpretation (unreliable):** {label}")
+        elif prediction >= 0.80:
             st.success(f"**Flow interpretation:** {label}")
         elif prediction >= 0.60:
             st.info(f"**Flow interpretation:** {label}")
@@ -789,11 +902,7 @@ if show_prediction:
             st.warning(f"**Flow interpretation:** {label}")
 
         fig = plot_airfoil_and_separation(
-            root_chord=saved["root_chord"],
-            tip_chord=saved["tip_chord"],
-            sweep_angle=saved["sweep_angle"],
             separation_x_over_c=prediction,
-            airfoil_family=saved["airfoil_family"],
             dark_mode=dark_mode,
         )
         st.pyplot(fig)

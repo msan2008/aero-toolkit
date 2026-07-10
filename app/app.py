@@ -238,6 +238,44 @@ st.markdown(
 # -----------------------------------------------------------------------------
 # Helper functions
 # -----------------------------------------------------------------------------
+def get_model_metrics_safe() -> dict[str, float]:
+    """Return held-out validation metrics, or {} if none are recorded.
+
+    Falls back to the R^2-only API when running against an older
+    src/inference.py that predates get_model_metrics().
+    """
+    try:
+        from src.inference import get_model_metrics  # type: ignore  # noqa: E402
+
+        return {k: float(v) for k, v in get_model_metrics().items() if v is not None}
+    except Exception:
+        score = get_model_r2()
+        return {"r2": score} if score is not None else {}
+
+
+def format_reliability_note(metrics: dict[str, float]) -> str:
+    """Build a one-line held-out performance summary from whatever is available."""
+    parts = []
+    if "r2" in metrics:
+        parts.append(f"R² = {metrics['r2']:.3f}")
+    if "mae" in metrics:
+        parts.append(f"MAE = {metrics['mae']:.3f} x/c")
+    if "rmse" in metrics:
+        parts.append(f"RMSE = {metrics['rmse']:.3f} x/c")
+
+    note = "**Model reliability (held-out test set):** " + " · ".join(parts)
+
+    # MAE is in units of chord fraction, so it converts directly into the
+    # "how wrong is this number likely to be" statement users actually want.
+    if "mae" in metrics:
+        note += (
+            f". On unseen designs the model is typically off by about "
+            f"{metrics['mae'] * 100:.1f}% of the chord, so read the prediction above "
+            "as a range, not a point value."
+        )
+    return note
+
+
 def get_model_r2() -> float | None:
     """Return the trained model's R^2 score if the inference layer exposes one.
 
@@ -848,26 +886,53 @@ if show_explanations:
         st.write("Expected model feature order:")
         st.write(get_required_feature_columns())
 
-        st.write("R² diagnostics:")
+        st.write("Validation metric diagnostics:")
         try:
-            from src.inference import get_model_r2_score  # noqa: E402
+            from src.inference import get_metrics_diagnostics  # noqa: E402
 
-            raw_r2 = get_model_r2_score()
+            diag = get_metrics_diagnostics()
+            st.json(diag)
+
+            if diag["resolved_metrics"]:
+                st.success(diag["explanation"])
+            elif diag["source_file"] is None:
+                st.warning(diag["explanation"])
+                st.code(
+                    'import json, pathlib\n'
+                    '# Run this at the end of Notebook 2, after evaluating on the test split.\n'
+                    'from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error\n'
+                    'import numpy as np\n\n'
+                    'y_pred = model.predict(X_test)\n'
+                    'metrics = {\n'
+                    '    "r2": float(r2_score(y_test, y_pred)),\n'
+                    '    "mae": float(mean_absolute_error(y_test, y_pred)),\n'
+                    '    "rmse": float(np.sqrt(mean_squared_error(y_test, y_pred))),\n'
+                    '}\n'
+                    'pathlib.Path("models/metrics.json").write_text(json.dumps(metrics, indent=2))\n'
+                    'print(metrics)',
+                    language="python",
+                )
+            else:
+                st.error(diag["explanation"])
+        except ImportError:
+            st.info(
+                "This build of src/inference.py predates get_metrics_diagnostics(). "
+                "Falling back to the R² check."
+            )
+            raw_r2 = get_model_r2()
             st.write({"get_model_r2_score() returned": raw_r2})
             if raw_r2 is None:
                 st.warning(
-                    "The function imported fine but returned None. No metrics file was found "
-                    "and DEFAULT_MODEL_R2 is not set. Add models/metrics.json (e.g. {\"r2\": 0.93}) "
-                    "or set DEFAULT_MODEL_R2 in src/inference.py to display a value."
+                    "No metrics file was found and DEFAULT_MODEL_R2 is not set. "
+                    'Add models/metrics.json (e.g. {"r2": 0.93}) or set DEFAULT_MODEL_R2 '
+                    "in src/inference.py."
                 )
-            else:
-                st.success("R² is being read correctly and will display next to the prediction.")
         except Exception as e:
-            st.error(f"Could not import get_model_r2_score from src.inference: {e!r}")
+            st.error(f"Could not read metrics from src.inference: {e!r}")
             st.info(
-                "This means the app is not importing the updated src/inference.py. Confirm the new "
-                "inference.py actually replaced the file at <project>/src/inference.py, then fully "
-                "restart Streamlit (editing it while running is often not enough)."
+                "This usually means the app is not importing the updated src/inference.py. "
+                "Confirm the new inference.py replaced the file at <project>/src/inference.py, "
+                "then fully restart Streamlit (editing it while running is often not enough)."
             )
 
 # -----------------------------------------------------------------------------
@@ -962,6 +1027,28 @@ if show_prediction:
             f"This means the model predicts separation about {prediction * 100:.0f}% of the way "
             "from the leading edge to the trailing edge."
         )
+
+        # Held-out validation metrics, so the number above is read with the
+        # model's actual accuracy in view rather than as an exact value.
+        metrics = get_model_metrics_safe()
+        if metrics:
+            st.caption(format_reliability_note(metrics))
+
+            # Turn MAE into an explicit band around the prediction. This is a
+            # typical-error range, not a statistical confidence interval.
+            if "mae" in metrics:
+                low = max(0.0, prediction - metrics["mae"])
+                high = min(1.0, prediction + metrics["mae"])
+                st.caption(
+                    f"Typical-error band: x/c ≈ {low:.2f} – {high:.2f}. "
+                    "This is the model's average error on held-out data, not a confidence interval."
+                )
+        else:
+            st.caption(
+                "**Model reliability:** no validation metrics recorded. Add `models/metrics.json` "
+                '(e.g. `{"r2": 0.93, "mae": 0.028, "rmse": 0.041}`) so this prediction can be '
+                "reported with its held-out accuracy."
+            )
 
         # A clipped value is a boundary artifact. Say so before the flow
         # interpretation, so it is never read as a confident result.

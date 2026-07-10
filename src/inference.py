@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import joblib
 import pandas as pd
@@ -46,6 +46,20 @@ REQUIRED_FEATURE_COLUMNS = [
     "angle_of_attack",
     "airspeed",
 ]
+
+# -----------------------------------------------------------------------------
+# Physical bounds on the target
+# -----------------------------------------------------------------------------
+# separation_x_over_c is a normalized chord position, so anything outside
+# [0, 1] is physically meaningless. The regressor is free to produce such
+# values under extrapolation, so predictions are clipped before display.
+#
+# Clipping is a *safety net*, not a result: a clipped value tells you the model
+# left its supported range, and it should not be presented with the same
+# confidence as an interior prediction. predict_raw_from_dict() below exposes
+# the unclipped output so callers can detect and report this.
+SEPARATION_MIN = 0.0
+SEPARATION_MAX = 1.0
 
 # -----------------------------------------------------------------------------
 # Model evaluation metric (R^2)
@@ -181,16 +195,41 @@ def make_input_dataframe(input_dict: Dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame([row], columns=REQUIRED_FEATURE_COLUMNS)
 
 
-def predict_from_dict(input_dict: Dict[str, Any]) -> float:
-    """Run the saved model on one input dictionary and return one float prediction."""
+def clip_prediction(value: float) -> float:
+    """Clamp a raw prediction into the physical range [0, 1]."""
+    return max(SEPARATION_MIN, min(SEPARATION_MAX, value))
+
+
+def predict_raw_from_dict(input_dict: Dict[str, Any]) -> float:
+    """Run the saved model and return the UNCLIPPED float prediction.
+
+    This is the value the model actually produced. It may fall outside [0, 1]
+    when the inputs push the model to extrapolate. Callers that display results
+    to a user should prefer this function together with clip_prediction(), so
+    that out-of-range outputs can be reported rather than silently hidden.
+    """
     model = load_model()
     input_df = make_input_dataframe(input_dict)
     prediction = model.predict(input_df)
-    value = float(prediction[0])
+    return float(prediction[0])
 
-    # separation_x_over_c should be normalized. Clipping protects the UI from
-    # rare extrapolation artifacts, but the training data should also be checked.
-    return max(0.0, min(1.0, value))
+
+def predict_with_clipping(input_dict: Dict[str, Any]) -> Tuple[float, float, bool]:
+    """Return (raw_value, clipped_value, was_clipped) for one input dictionary."""
+    raw_value = predict_raw_from_dict(input_dict)
+    clipped_value = clip_prediction(raw_value)
+    return raw_value, clipped_value, raw_value != clipped_value
+
+
+def predict_from_dict(input_dict: Dict[str, Any]) -> float:
+    """Run the saved model on one input dictionary and return one float prediction.
+
+    The returned value is clipped to [0, 1]. Callers that need to know whether
+    clipping occurred should use predict_with_clipping() or predict_raw_from_dict()
+    instead; this function is kept for backward compatibility and silently hides
+    the distinction between a genuine 1.0 and a clamped 1.4.
+    """
+    return clip_prediction(predict_raw_from_dict(input_dict))
 
 
 def describe_prediction(separation_x_over_c: float) -> str:

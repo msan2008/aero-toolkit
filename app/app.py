@@ -253,30 +253,6 @@ def get_model_metrics_safe() -> dict[str, float]:
         return {"r2": score} if score is not None else {}
 
 
-# Display order used by the metric dropdown and the reliability note.
-METRIC_KEYS = ("r2", "mae", "rmse")
-
-METRIC_LABELS = {
-    "r2": "Model R²",
-    "mae": "Model MAE",
-    "rmse": "Model RMSE",
-}
-
-# One-line plain-language reading of each metric, shown under the selected value.
-METRIC_HELP = {
-    "r2": "Share of test-set variation the model explains (1.00 is perfect). Higher is better.",
-    "mae": "Average error on held-out designs, in chord fraction. Lower is better.",
-    "rmse": "Like MAE but penalizes large misses more, in chord fraction. Lower is better.",
-}
-
-
-def format_metric_value(metric_key: str, value: float) -> str:
-    """R² is a bare 0–1 score; MAE/RMSE are chord fractions, shown with a unit."""
-    if metric_key == "r2":
-        return f"{value:.3f}"
-    return f"{value:.3f} x/c"
-
-
 def format_reliability_note(metrics: dict[str, float]) -> str:
     """Build a one-line held-out performance summary from whatever is available."""
     parts = []
@@ -1037,35 +1013,12 @@ if show_prediction:
         clip_status = st.session_state.latest_clip_status
         raw_output = st.session_state.latest_raw_output
         baseline = st.session_state.latest_baseline
-        metrics = get_model_metrics_safe()
-
-        # The middle metric column lets the user pick which validation metric to
-        # view. We only offer metrics that were actually found, so the dropdown
-        # never promises a value the model file doesn't provide.
-        available_metric_keys = [key for key in METRIC_KEYS if key in metrics]
+        r2_value = get_model_r2()
 
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("Predicted separation_x_over_c", f"{prediction:.2f}")
         m_col1.caption("This is a screening estimate, not a measured value")
-
-        with m_col2:
-            if available_metric_keys:
-                selected_metric = st.selectbox(
-                    "Validation metric",
-                    available_metric_keys,
-                    format_func=lambda key: METRIC_LABELS[key],
-                    key="selected_metric",
-                    label_visibility="collapsed",
-                )
-                st.metric(
-                    METRIC_LABELS[selected_metric],
-                    format_metric_value(selected_metric, metrics[selected_metric]),
-                )
-                st.caption(METRIC_HELP[selected_metric])
-            else:
-                st.metric("Model R²", "N/A")
-                st.caption("No validation metrics recorded (see below).")
-
+        m_col2.metric("Model R²", f"{r2_value:.3f}" if r2_value is not None else "N/A")
         # Two decimals on x/c means one decimal here would be false precision.
         m_col3.metric("Separation location", f"{prediction * 100:.0f}% chord")
 
@@ -1076,9 +1029,8 @@ if show_prediction:
         )
 
         # Held-out validation metrics, so the number above is read with the
-        # model's actual accuracy in view rather than as an exact value. The
-        # note always lists all available metrics; the dropdown above only
-        # changes which one is highlighted in the metric row.
+        # model's actual accuracy in view rather than as an exact value.
+        metrics = get_model_metrics_safe()
         if metrics:
             st.caption(format_reliability_note(metrics))
 

@@ -315,6 +315,7 @@ def clipping_message(status: str, raw_prediction: float) -> str:
 def plot_airfoil_and_separation(
     separation_x_over_c: float,
     dark_mode: bool = False,
+    baseline_x_over_c: float | None = None,
 ) -> plt.Figure:
     if dark_mode:
         bg_color = "#0e1117"
@@ -347,6 +348,22 @@ def plot_airfoil_and_separation(
     ax.text(0.0, -0.11, "Leading edge", ha="left", va="top", fontsize=9, color=fg_color)
     ax.text(1.0, -0.11, "Trailing edge", ha="right", va="top", fontsize=9, color=fg_color)
 
+    # Optional symmetric-baseline reference, drawn muted so the selected design
+    # stays visually dominant.
+    if baseline_x_over_c is not None:
+        baseline_color = "#8a8f98" if not dark_mode else "#9aa0a8"
+        ax.axvline(baseline_x_over_c, linestyle=":", linewidth=1.5, color=baseline_color)
+        ax.scatter([baseline_x_over_c], [0], s=70, zorder=2, color=baseline_color, marker="s")
+        ax.text(
+            baseline_x_over_c,
+            -0.20,
+            f"baseline {baseline_x_over_c:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            color=baseline_color,
+        )
+
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.25, 0.35)
     ax.set_xlabel("Normalized chord location (x/c)", color=fg_color)
@@ -357,6 +374,58 @@ def plot_airfoil_and_separation(
         spine.set_color(fg_color)
     ax.grid(True, axis="x", alpha=0.3)
     return fig
+
+
+def run_single_prediction(payload: dict) -> dict:
+    """Predict once and return the rounded value plus clipping provenance."""
+    if HAS_RAW_PREDICTION:
+        model_output = float(predict_raw_from_dict(payload))
+    else:
+        model_output = float(predict_from_dict(payload))
+    bounded, clip_status = evaluate_clipping(model_output)
+    return {
+        "prediction": round(bounded, 2),
+        "raw": model_output,
+        "clip_status": clip_status,
+    }
+
+
+def build_symmetric_baseline_inputs(payload: dict) -> dict:
+    """Return the same flow condition on a plain symmetric wing.
+
+    Airspeed, angle of attack, chords, and sweep are held fixed; only the
+    airfoil family and the tubercle geometry change. That makes the comparison
+    a like-for-like question: at this exact flow condition, what does the
+    tubercle geometry buy you?
+    """
+    baseline = dict(payload)
+    baseline["airfoil_family"] = "symmetric"
+    baseline["tubercle_shape"] = "none"
+    baseline["tubercle_amplitude"] = 0.0
+    baseline["tubercle_wavelength"] = 0.0
+    return baseline
+
+
+def describe_baseline_delta(delta: float) -> str:
+    """Plain-language reading of (biomimetic - symmetric) separation location."""
+    # Below one rounding unit, the two predictions are indistinguishable at the
+    # precision this app displays. Claiming a difference would be false precision.
+    if abs(delta) < 0.01:
+        return (
+            "The model predicts effectively the same separation location for both wings "
+            "at this flow condition — no meaningful difference at the precision shown."
+        )
+    if delta > 0:
+        return (
+            f"The model predicts separation about {abs(delta) * 100:.0f}% of the chord **later** "
+            "on the biomimetic wing than on a symmetric wing at the same angle of attack and "
+            "airspeed. Later separation is the outcome tubercles are intended to produce."
+        )
+    return (
+        f"The model predicts separation about {abs(delta) * 100:.0f}% of the chord **earlier** "
+        "on the biomimetic wing than on a symmetric wing at the same angle of attack and "
+        "airspeed. At this flow condition the tubercle geometry is not helping."
+    )
 
 
 def sustainability_interpretation(separation_x_over_c: float) -> tuple[str, str]:
@@ -390,8 +459,8 @@ def build_sustainability_table(
         rows.append(
             {
                 "Assumed efficiency improvement": f"{efficiency_gain_percent}%",
-                "Estimated energy saved (kWh)": round(saved_kwh, 3),
-                "Hypothetical CO₂ avoided (kg)": round(avoided_kg_co2, 3),
+                "Hypothetical energy saved (kWh)": round(saved_kwh, 3),
+                "Estimated CO₂ avoided under assumed efficiency gain (kg)": round(avoided_kg_co2, 3),
             }
         )
     return pd.DataFrame(rows)
@@ -726,6 +795,10 @@ if "latest_clip_status" not in st.session_state:
     st.session_state.latest_clip_status = None
 if "latest_raw_output" not in st.session_state:
     st.session_state.latest_raw_output = None
+if "latest_baseline" not in st.session_state:
+    # dict from run_single_prediction() for a symmetric wing at the same flow
+    # condition, or None when the selected family is not biomimetic.
+    st.session_state.latest_baseline = None
 if "prediction_history" not in st.session_state:
     # Accumulates one record per successful run (inputs + prediction).
     st.session_state.prediction_history = []
@@ -814,15 +887,23 @@ if show_prediction:
             # Prefer the unclipped output so clipping can be reported honestly.
             # The fallback path receives an already-clipped value, in which case
             # only the boundary heuristic in evaluate_clipping() can detect it.
-            if HAS_RAW_PREDICTION:
-                model_output = float(predict_raw_from_dict(input_dict))
-            else:
-                model_output = float(predict_from_dict(input_dict))
+            # Clamping happens before rounding: a raw 1.4 must not round to 1.40
+            # and be presented as if the model meant it.
+            result = run_single_prediction(input_dict)
+            model_output = result["raw"]
+            clip_status = result["clip_status"]
+            prediction = result["prediction"]
 
-            # Clamp before rounding: a raw 1.4 must not round to 1.40 and be
-            # presented as if the model meant it.
-            bounded, clip_status = evaluate_clipping(model_output)
-            prediction = round(bounded, 2)
+            # Compare to baseline: same flow condition, plain symmetric wing.
+            # Wrapped separately so a baseline failure never discards the
+            # user's actual prediction.
+            baseline = None
+            if input_dict["airfoil_family"] == "biomimetic":
+                try:
+                    baseline = run_single_prediction(build_symmetric_baseline_inputs(input_dict))
+                except Exception:
+                    baseline = None
+            st.session_state.latest_baseline = baseline
 
             # Label is derived from the rounded value so a prediction of 0.795
             # cannot display as "0.80" while carrying the sub-0.80 label.
@@ -842,6 +923,10 @@ if show_prediction:
                 "predicted_separation_x_over_c": prediction,
                 "raw_model_output": round(model_output, 4),
                 "clipped": clip_status is not None,
+                "symmetric_baseline_x_over_c": baseline["prediction"] if baseline else None,
+                "delta_vs_baseline": (
+                    round(prediction - baseline["prediction"], 2) if baseline else None
+                ),
                 "flow_interpretation": label,
             }
             st.session_state.prediction_history.append(record)
@@ -850,6 +935,7 @@ if show_prediction:
             st.session_state.latest_input_dict = None
             st.session_state.latest_label = None
             st.session_state.latest_clip_status = None
+            st.session_state.latest_baseline = None
             st.error(f"Prediction failed: {e}")
             st.info(
                 "This is usually a model-file synchronization issue. Check that the saved .joblib model is present in the models/ folder, "
@@ -861,6 +947,7 @@ if show_prediction:
         label = st.session_state.latest_label
         clip_status = st.session_state.latest_clip_status
         raw_output = st.session_state.latest_raw_output
+        baseline = st.session_state.latest_baseline
         r2_value = get_model_r2()
 
         m_col1, m_col2, m_col3 = st.columns(3)
@@ -904,9 +991,46 @@ if show_prediction:
         fig = plot_airfoil_and_separation(
             separation_x_over_c=prediction,
             dark_mode=dark_mode,
+            baseline_x_over_c=baseline["prediction"] if baseline else None,
         )
         st.pyplot(fig)
         plt.close(fig)
+
+        # -------------------------------------------------------------------
+        # Compare to Baseline (biomimetic selections only)
+        # -------------------------------------------------------------------
+        if baseline is not None:
+            st.markdown("#### Compare to Baseline")
+            st.caption(
+                "The same angle of attack and airspeed, run again on a plain symmetric wing "
+                "with no tubercles."
+            )
+
+            delta = round(prediction - baseline["prediction"], 2)
+            b_col1, b_col2, b_col3 = st.columns(3)
+            b_col1.metric("Biomimetic (selected)", f"{prediction:.2f}")
+            b_col2.metric("Symmetric baseline", f"{baseline['prediction']:.2f}")
+            b_col3.metric(
+                "Difference in x/c",
+                f"{delta:+.2f}",
+                delta=f"{delta * 100:+.0f}% chord",
+            )
+
+            st.write(describe_baseline_delta(delta))
+
+            if baseline["clip_status"] is not None:
+                st.warning(
+                    "**Baseline clipped:** "
+                    f"{clipping_message(baseline['clip_status'], baseline['raw'])} "
+                    "The comparison above is unreliable because the baseline value is a "
+                    "boundary artifact."
+                )
+
+            st.caption(
+                "Both numbers come from the same screening model, so this is a comparison of "
+                "predictions, not experimental evidence that tubercles delay separation. "
+                "Confirming a real difference requires CFD or wind-tunnel testing."
+            )
 
     # Full run history (every prediction made this session), shown independently
     # of the latest-run panel so it persists even after a failed run.
@@ -951,7 +1075,7 @@ if show_sustainability:
         st.markdown(f"**Prediction-based design note:** {sustain_label}")
         st.write(sustain_text)
     else:
-        st.info("Run a prediction first to connect this sustainability discussion to your selected wing design.")
+        st.info("Run a prediction first to connect this sustainability estimate to your selected wing design.")
 
     calc_col1, calc_col2, calc_col3 = st.columns(3)
     with calc_col1:
@@ -1007,17 +1131,18 @@ if show_about:
     st.write(
         "This toolkit is meant to be a screening tool to help students and enthusiasts "
         "test potential aerofoil designs before moving onto expensive and time consuming "
-        "CFD and physical testing. It is an educational tool meant to educate the public "
-        "about biomimetic wings and their applications in improving aerodynamic efficiency "
-        "and the environmental impact of the aviation industry. The software for this "
-        "toolkit can be found in the Github repository."
+        "CFD and physical testing. It is an educational tool. The toolkit helps users "
+        "explore how aerodynamic design choices can connect to energy efficiency and "
+        "sustainable engineering. The software for this toolkit can be found in the "
+        "Github repository."
     )
 
     st.header("About the Creator")
     st.write(
         "This toolkit was created by Madhav S Anoop, a rising senior at Round Rock High "
-        "School in Austin, Texas. Since he was little, Madhav has been passionate in "
-        "aerospace engineering, physics, and mathematics. His research involves designing "
-        "and testing biomimetic wings that reduce aerodynamic drag. He intends to continue "
-        "his research and pursue his passion as an aerospace engineer."
+        "School in Austin, Texas. Since he was little, Madhav has been passionate about "
+        "aerospace engineering, physics, and mathematics. His research explores biomimetic "
+        "wing designs that may help delay flow separation and improve aerodynamic "
+        "efficiency. He intends to continue his research and pursue his passion as an "
+        "aerospace engineer."
     )

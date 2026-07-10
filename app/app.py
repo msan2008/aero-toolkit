@@ -381,6 +381,81 @@ st.markdown(
 )
 
 # -----------------------------------------------------------------------------
+# Presets
+#
+# Each preset writes directly into the widget keys used by the input bar below.
+# Tubercle values are always stored inside the sliders' valid ranges (even for
+# the non-biomimetic presets) so the sliders never re-render with an
+# out-of-bounds value; the "none"/0.0 substitution happens later, when the
+# input dictionary is assembled.
+# -----------------------------------------------------------------------------
+PRESETS: dict[str, dict] = {
+    "Symmetric baseline": {
+        "airfoil_family": "symmetric",
+        "angle_of_attack": 5.0,
+        "airspeed": 30,
+        "tubercle_shape": "whale",
+        "tubercle_amplitude": 26.2,
+        "tubercle_wavelength": 49.6,
+    },
+    "Cambered baseline": {
+        "airfoil_family": "cambered",
+        "angle_of_attack": 5.0,
+        "airspeed": 30,
+        "tubercle_shape": "whale",
+        "tubercle_amplitude": 26.2,
+        "tubercle_wavelength": 49.6,
+    },
+    "Biomimetic default": {
+        "airfoil_family": "biomimetic",
+        "angle_of_attack": 10.0,
+        "airspeed": 30,
+        "tubercle_shape": "whale",
+        "tubercle_amplitude": 26.2,
+        "tubercle_wavelength": 49.6,
+    },
+    # A deliberately harder case: high angle of attack at low airspeed, with
+    # tubercle geometry at the opposite corner of the training envelope.
+    # Good starting point for a "can you delay separation?" workshop exercise.
+    "Workshop challenge": {
+        "airfoil_family": "biomimetic",
+        "angle_of_attack": 16.0,
+        "airspeed": 15,
+        "tubercle_shape": "whale",
+        "tubercle_amplitude": 32.7,
+        "tubercle_wavelength": 42.3,
+    },
+}
+
+# Biomimetic is the default because the project is centered on biomimicry, and
+# workshop users should see the tubercle controls on first load. Change this
+# one string to "Symmetric baseline" to start from the flat-plate comparison.
+DEFAULT_PRESET = "Biomimetic default"
+
+if "active_preset" not in st.session_state:
+    st.session_state.active_preset = DEFAULT_PRESET
+
+# setdefault (not direct assignment) so a user's manual edits survive reruns.
+# It also self-heals: Streamlit drops session_state entries for widgets that
+# were not rendered on the previous run, which is what happens to the tubercle
+# sliders whenever a non-biomimetic family is selected.
+for _key, _value in PRESETS[DEFAULT_PRESET].items():
+    st.session_state.setdefault(_key, _value)
+
+
+def apply_preset(name: str) -> None:
+    """Write a preset into the widget keys.
+
+    This runs before the input widgets are instantiated on the current script
+    run, so no explicit st.rerun() is needed: the button click already
+    triggered the rerun, and the widgets pick these values up as they render.
+    """
+    for key, value in PRESETS[name].items():
+        st.session_state[key] = value
+    st.session_state.active_preset = name
+
+
+# -----------------------------------------------------------------------------
 # Top Input Bar (Condensed Single Row, batched inside a form)
 # -----------------------------------------------------------------------------
 st.markdown("---")
@@ -388,6 +463,19 @@ st.markdown("---")
 root_chord = 1.0
 tip_chord = 1.0
 sweep_angle = 0.0
+
+# Preset buttons must live outside the form: Streamlit only permits
+# st.form_submit_button inside a form block.
+preset_cols = st.columns(len(PRESETS))
+for _col, _preset_name in zip(preset_cols, PRESETS):
+    with _col:
+        if st.button(_preset_name, use_container_width=True, key=f"preset_{_preset_name}"):
+            apply_preset(_preset_name)
+
+st.caption(
+    f"Last preset applied: **{st.session_state.active_preset}**. "
+    "Presets fill the input bar below — you can still adjust any control before running."
+)
 
 # Wrapping the controls in a form means widget changes (especially dragging the
 # AoA slider) no longer trigger a rerun on every interaction. The script only
@@ -399,16 +487,27 @@ with st.form("input_form"):
     # 7 columns for a highly condensed, single-bar layout
     cols = st.columns([1.2, 1, 1, 0.8, 1.2, 1, 1])
 
+    # Every widget below is driven by session_state via `key`, which is what
+    # lets the preset buttons populate them. Note that `value=`/`index=` are
+    # deliberately omitted: passing both a key and a default triggers a
+    # Streamlit warning about conflicting sources of truth.
     with cols[0]:
-        airfoil_family = st.selectbox("Airfoil Family", ["symmetric", "cambered", "biomimetic"], index=0)
+        airfoil_family = st.selectbox(
+            "Airfoil Family",
+            ["symmetric", "cambered", "biomimetic"],
+            key="airfoil_family",
+        )
     with cols[1]:
-        angle_of_attack = st.slider("AoA (°)", min_value=0.0, max_value=25.0, value=10.0, step=0.5, format="%.1f")
+        angle_of_attack = st.slider(
+            "AoA (°)", min_value=0.0, max_value=25.0, step=0.5, format="%.1f",
+            key="angle_of_attack",
+        )
     with cols[2]:
         airspeed = st.selectbox(
             "Airspeed (m/s)",
             [15, 30],
-            index=1,
             format_func=lambda v: f"{v} m/s",
+            key="airspeed",
         )
     with cols[3]:
         st.markdown(
@@ -419,18 +518,26 @@ with st.form("input_form"):
 
     if airfoil_family == "biomimetic":
         with cols[4]:
-            tubercle_shape = st.selectbox("Tubercle Shape", ["whale", "biomimetic_v1"], index=0)
+            tubercle_shape = st.selectbox(
+                "Tubercle Shape", ["whale", "biomimetic_v1"], key="tubercle_shape"
+            )
         with cols[5]:
-            tubercle_amplitude = st.slider("Amplitude (mm)", min_value=26.2, max_value=32.7, value=26.2, step=0.1, format="%.1f mm")
+            tubercle_amplitude = st.slider(
+                "Amplitude (mm)", min_value=26.2, max_value=32.7, step=0.1,
+                format="%.1f mm", key="tubercle_amplitude",
+            )
         with cols[6]:
-            tubercle_wavelength = st.slider("Wavelength (mm)", min_value=42.3, max_value=49.6, value=49.6, step=0.1, format="%.1f mm")
+            tubercle_wavelength = st.slider(
+                "Wavelength (mm)", min_value=42.3, max_value=49.6, step=0.1,
+                format="%.1f mm", key="tubercle_wavelength",
+            )
     else:
         tubercle_shape = "none"
         tubercle_amplitude = 0.0
         tubercle_wavelength = 0.0
 
     st.markdown('</div>', unsafe_allow_html=True)
-    st.caption("Slider inputs are intentionally kept within training range")
+    st.caption("Inputs are limited to the model's training range to avoid unsupported extrapolation.")
     submitted = st.form_submit_button("Run Prediction", type="primary")
 
 st.markdown("---")
@@ -625,7 +732,15 @@ if show_prediction:
 
     if submitted:
         try:
-            prediction = float(predict_from_dict(input_dict))
+            # Round once, here, so the metric, the plot annotation, the flow
+            # interpretation, and the CSV export can never disagree. Two
+            # decimals is the right precision for a screening estimate; 0.7421
+            # implies a measurement accuracy this model does not have.
+            raw_prediction = float(predict_from_dict(input_dict))
+            prediction = round(raw_prediction, 2)
+
+            # Label is derived from the rounded value so a prediction of 0.795
+            # cannot display as "0.80" while carrying the sub-0.80 label.
             label = describe_prediction(prediction)
             st.session_state.latest_prediction = prediction
             st.session_state.latest_input_dict = dict(input_dict)
@@ -635,8 +750,9 @@ if show_prediction:
             record = {
                 "run": len(st.session_state.prediction_history) + 1,
                 "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "preset": st.session_state.active_preset,
                 **dict(input_dict),
-                "predicted_separation_x_over_c": round(prediction, 4),
+                "predicted_separation_x_over_c": prediction,
                 "flow_interpretation": label,
             }
             st.session_state.prediction_history.append(record)
@@ -660,7 +776,8 @@ if show_prediction:
         m_col1.metric("Predicted separation_x_over_c", f"{prediction:.2f}")
         m_col1.caption("This is a screening estimate, not a measured value")
         m_col2.metric("Model R²", f"{r2_value:.3f}" if r2_value is not None else "N/A")
-        m_col3.metric("Separation location", f"{prediction * 100:.1f}% chord")
+        # Two decimals on x/c means one decimal here would be false precision.
+        m_col3.metric("Separation location", f"{prediction * 100:.0f}% chord")
 
         # A sentence-style interpretation reads better as a colored callout than
         # as a metric (which is meant for short numeric values).

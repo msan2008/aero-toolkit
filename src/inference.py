@@ -9,6 +9,7 @@ and app/app.py.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -62,26 +63,64 @@ SEPARATION_MIN = 0.0
 SEPARATION_MAX = 1.0
 
 # -----------------------------------------------------------------------------
-# Model evaluation metric (R^2)
+# Model evaluation metrics (R^2, MAE, RMSE)
 # -----------------------------------------------------------------------------
-# The held-out R^2 is computed at *training* time and is NOT stored inside the
-# saved estimator, so it has to be supplied to the app separately. Two options:
+# Held-out validation metrics are computed at *training* time and are NOT stored
+# inside the saved estimator, so they have to be supplied to the app separately.
+# Two options:
 #   1) (recommended) Have Notebook 2 write a metrics file next to the model, e.g.
-#          models/metrics.json -> {"r2": 0.93}
+#          models/metrics.json -> {"r2": 0.93, "mae": 0.028, "rmse": 0.041}
 #      or, if you keep several models around, key it by filename:
-#          {"production_model.joblib": {"r2": 0.93}}
-#   2) Paste the number into DEFAULT_MODEL_R2 below for a quick hard-coded value.
+#          {"production_model.joblib": {"r2": 0.93, "mae": 0.028}}
+#   2) Paste the numbers into DEFAULT_MODEL_METRICS below for quick hard-coded values.
+#
+# MAE and RMSE are in the units of the target, i.e. fractions of chord. An MAE of
+# 0.028 means the model is typically off by about 2.8% of the chord length.
 METRICS_CANDIDATES = [
     MODELS_DIR / "metrics.json",
     MODELS_DIR / "model_metrics.json",
     MODELS_DIR / "notebook2_metrics.json",
+    PROJECT_ROOT / "metrics.json",
 ]
+
+
+def _candidate_metrics_paths() -> List[Path]:
+    """Explicit candidates first, then any other *metrics*.json in models/."""
+    paths = list(METRICS_CANDIDATES)
+    if MODELS_DIR.exists():
+        for extra in sorted(MODELS_DIR.glob("*metrics*.json")):
+            if extra not in paths:
+                paths.append(extra)
+    return paths
+
 
 # Quick fallback if you don't want to manage a metrics file. Set to e.g. 0.93.
 DEFAULT_MODEL_R2: float | None = None
+DEFAULT_MODEL_MAE: float | None = None
+DEFAULT_MODEL_RMSE: float | None = None
 
-# Accepted JSON keys for the R^2 value, in priority order.
-_R2_KEYS = ("r2", "test_r2", "r2_score", "R2", "r_squared")
+# Accepted JSON keys for each metric, in priority order. Held-out/test values are
+# listed before generic ones so a file containing both prefers the test score.
+_METRIC_ALIASES: Dict[str, Tuple[str, ...]] = {
+    "r2": ("test_r2", "r2", "r2_score", "R2", "r_squared", "val_r2"),
+    "mae": ("test_mae", "mae", "mean_absolute_error", "MAE", "val_mae"),
+    "rmse": ("test_rmse", "rmse", "root_mean_squared_error", "RMSE", "val_rmse"),
+    "mse": ("test_mse", "mse", "mean_squared_error", "MSE", "val_mse"),
+}
+
+# sklearn's cross_val_score reports errors negated (higher = better). If a file
+# records those directly, read them and flip the sign back.
+_NEGATED_ALIASES: Dict[str, Tuple[str, ...]] = {
+    "mae": ("neg_mean_absolute_error", "test_neg_mean_absolute_error"),
+    "mse": ("neg_mean_squared_error", "test_neg_mean_squared_error"),
+    "rmse": ("neg_root_mean_squared_error", "test_neg_root_mean_squared_error"),
+}
+
+# Sub-dictionaries that commonly wrap the actual scores.
+_NESTED_CONTAINER_KEYS = ("metrics", "scores", "test", "test_metrics", "evaluation", "results")
+
+# Backwards compatibility: some callers import this directly.
+_R2_KEYS = _METRIC_ALIASES["r2"]
 
 _CACHED_MODEL: Any | None = None
 _CACHED_MODEL_PATH: Path | None = None
@@ -129,56 +168,177 @@ def get_loaded_model_path() -> str:
     return str(find_model_path())
 
 
-def _read_metrics_file() -> Dict[str, Any]:
-    """Return the contents of the first readable metrics JSON, or {} if none."""
-    for candidate in METRICS_CANDIDATES:
-        if candidate.exists():
-            try:
-                with candidate.open("r", encoding="utf-8") as handle:
-                    data = json.load(handle)
-                if isinstance(data, dict):
-                    return data
-            except (json.JSONDecodeError, OSError):
-                continue
-    return {}
+def _read_metrics_file() -> Tuple[Dict[str, Any], Path | None]:
+    """Return (parsed_metrics_dict, source_path), or ({}, None) if none readable.
 
-
-def get_model_r2_score() -> float | None:
-    """Return the trained model's held-out R^2 score, or None if unknown.
-
-    Resolution order:
-      1) a metrics JSON in models/ keyed by the selected model filename
-         (e.g. {"production_model.joblib": {"r2": 0.93}});
-      2) a top-level value in that same JSON (e.g. {"r2": 0.93});
-      3) the DEFAULT_MODEL_R2 constant above;
-      4) None.
-
-    Returning None lets the app display "N/A" rather than a fabricated number.
+    A top-level JSON list is accepted and its first dict element used, since
+    some notebook exports write one record per model.
     """
-    metrics = _read_metrics_file()
+    for candidate in _candidate_metrics_paths():
+        if not candidate.exists():
+            continue
+        try:
+            with candidate.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        if isinstance(data, dict):
+            return data, candidate
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    return item, candidate
+    return {}, None
+
+
+def _metric_sources() -> List[Dict[str, Any]]:
+    """Return dicts to search for metrics, most specific first.
+
+    Handles three layouts seen in practice:
+        {"r2": 0.93}                                   flat
+        {"production_model.joblib": {"r2": 0.93}}      keyed by model filename
+        {"metrics": {"r2": 0.93}}                      wrapped in a container
+    and any combination of the last two.
+    """
+    metrics, _ = _read_metrics_file()
 
     try:
         model_name: str | None = Path(get_loaded_model_path()).name
     except Exception:
         model_name = None
 
-    # Sources to inspect, most specific first.
-    sources: List[Any] = []
-    if model_name and isinstance(metrics.get(model_name), dict):
-        sources.append(metrics[model_name])
-    sources.append(metrics)  # allow a flat {"r2": 0.93}
+    sources: List[Dict[str, Any]] = []
+
+    def add_with_nested(candidate: Any) -> None:
+        if not isinstance(candidate, dict):
+            return
+        sources.append(candidate)
+        for container_key in _NESTED_CONTAINER_KEYS:
+            nested = candidate.get(container_key)
+            if isinstance(nested, dict):
+                sources.append(nested)
+
+    if model_name:
+        add_with_nested(metrics.get(model_name))
+    add_with_nested(metrics)
+    return sources
+
+
+def _lookup_metric(name: str) -> float | None:
+    """Find one metric by any accepted alias, including negated sklearn keys."""
+    sources = _metric_sources()
 
     for source in sources:
-        if not isinstance(source, dict):
-            continue
-        for key in _R2_KEYS:
+        for key in _METRIC_ALIASES.get(name, ()):
             if key in source:
                 try:
                     return float(source[key])
                 except (TypeError, ValueError):
                     pass
 
-    return DEFAULT_MODEL_R2
+    # Only fall back to negated scorers if no direct key was found.
+    for source in sources:
+        for key in _NEGATED_ALIASES.get(name, ()):
+            if key in source:
+                try:
+                    return abs(float(source[key]))
+                except (TypeError, ValueError):
+                    pass
+    return None
+
+
+def get_metrics_diagnostics() -> Dict[str, Any]:
+    """Explain exactly why metrics did or did not resolve.
+
+    Intended for the app's diagnostics panel: when the UI shows "N/A", this
+    says whether the file was missing, unreadable, or present-but-unrecognized.
+    """
+    searched = _candidate_metrics_paths()
+    metrics, source_path = _read_metrics_file()
+
+    try:
+        model_name: str | None = Path(get_loaded_model_path()).name
+    except Exception:
+        model_name = None
+
+    resolved = get_model_metrics()
+
+    if source_path is None:
+        reason = (
+            "No metrics file found. Create one of the searched paths, or set "
+            "DEFAULT_MODEL_R2 / DEFAULT_MODEL_MAE / DEFAULT_MODEL_RMSE in src/inference.py."
+        )
+    elif not resolved:
+        reason = (
+            f"Found {source_path.name}, but none of its keys matched a known metric name. "
+            f"Top-level keys present: {sorted(metrics)[:12]}. Rename them to r2 / mae / rmse."
+        )
+    else:
+        missing = [m for m in ("r2", "mae", "rmse") if m not in resolved]
+        reason = f"Read {len(resolved)} metric(s) from {source_path.name}."
+        if missing:
+            reason += f" Not recorded in the file: {', '.join(missing)}."
+
+    return {
+        "searched_paths": [str(path) for path in searched],
+        "existing_paths": [str(path) for path in searched if path.exists()],
+        "source_file": str(source_path) if source_path else None,
+        "selected_model": model_name,
+        "top_level_keys": sorted(metrics) if metrics else [],
+        "resolved_metrics": resolved,
+        "explanation": reason,
+    }
+
+
+def get_model_metrics() -> Dict[str, float]:
+    """Return whatever held-out validation metrics are available.
+
+    Keys are a subset of {"r2", "mae", "rmse"}; absent metrics are omitted
+    rather than faked, so the app can display only what it actually knows.
+
+    Resolution order per metric:
+      1) a metrics JSON in models/ keyed by the selected model filename;
+      2) a top-level value in that same JSON;
+      3) the corresponding DEFAULT_MODEL_* constant above.
+
+    RMSE is derived from MSE when only MSE is recorded.
+    """
+    resolved: Dict[str, float] = {}
+
+    r2 = _lookup_metric("r2")
+    if r2 is None:
+        r2 = DEFAULT_MODEL_R2
+    if r2 is not None:
+        resolved["r2"] = float(r2)
+
+    mae = _lookup_metric("mae")
+    if mae is None:
+        mae = DEFAULT_MODEL_MAE
+    if mae is not None:
+        resolved["mae"] = float(mae)
+
+    rmse = _lookup_metric("rmse")
+    if rmse is None:
+        mse = _lookup_metric("mse")
+        # sqrt(MSE) is RMSE by definition; only derive it when RMSE is absent.
+        if mse is not None and mse >= 0:
+            rmse = math.sqrt(mse)
+    if rmse is None:
+        rmse = DEFAULT_MODEL_RMSE
+    if rmse is not None:
+        resolved["rmse"] = float(rmse)
+
+    return resolved
+
+
+def get_model_r2_score() -> float | None:
+    """Return the trained model's held-out R^2 score, or None if unknown.
+
+    Returning None lets the app display "N/A" rather than a fabricated number.
+    Kept as a thin wrapper over get_model_metrics() for backward compatibility.
+    """
+    return get_model_metrics().get("r2", DEFAULT_MODEL_R2)
 
 
 def validate_input(input_dict: Dict[str, Any]) -> None:
@@ -247,4 +407,4 @@ if __name__ == "__main__":
     print("Models directory:", MODELS_DIR)
     print("Available model files:", _available_joblib_files())
     print("Selected model:", find_model_path())
-    print("Model R^2:", get_model_r2_score())
+    print("Model metrics:", get_model_metrics())

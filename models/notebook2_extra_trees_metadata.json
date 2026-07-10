@@ -1,0 +1,43 @@
+{
+  "dataset_path": "openfoam_phase2_cleaned.csv",
+  "target_column": "separation_x_over_c",
+  "feature_columns_used": [
+    "airfoil_family",
+    "tubercle_amplitude",
+    "tubercle_wavelength",
+    "tubercle_shape",
+    "angle_of_attack",
+    "airspeed"
+  ],
+  "dropped_constant_columns": [
+    "root_chord",
+    "tip_chord",
+    "sweep_angle"
+  ],
+  "categorical_features": [
+    "airfoil_family",
+    "tubercle_shape"
+  ],
+  "numeric_features": [
+    "tubercle_amplitude",
+    "tubercle_wavelength",
+    "angle_of_attack",
+    "airspeed"
+  ],
+  "group_column_used": "synthetic_group_key",
+  "grouped_cv_used": true,
+  "best_model_name_pre_tuning": "Extra Trees",
+  "best_model_filename": "notebook2_extra_trees.joblib",
+  "best_params": {
+    "model__max_depth": null,
+    "model__max_features": 1.0,
+    "model__min_samples_leaf": 2,
+    "model__min_samples_split": 2,
+    "model__n_estimators": 400
+  },
+  "holdout_metrics": {
+    "mae": 0.012155828015452735,
+    "rmse": 0.02030589137390699,
+    "r2": 0.9840736814929149
+  }
+}

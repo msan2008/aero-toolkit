@@ -43,9 +43,18 @@ except ImportError:
 # wrapped in try/except: if it fails on a given Streamlit version, the CSS
 # block further down still repaints the visible controls.
 # -----------------------------------------------------------------------------
-ACCENT = "#3f6184"          # slate blue
-ACCENT_HOVER = "#34506d"
+ACCENT = "#3f6184"          # slate blue — used for primary buttons (needs
+ACCENT_HOVER = "#34506d"    # enough contrast for white button text)
 TRACK_OFF = "#c8ccd4"       # unchecked toggle track (light mode)
+
+# Baby-blue palette for the sidebar, toggles, and sliders. Three shades so the
+# on-state toggle stays visible against the sidebar it sits on:
+#   SIDEBAR_BLUE  soft, pale — the sidebar background
+#   BABY_BLUE     stronger fill — toggle "on" track, slider thumb + filled track
+#   BABY_BLUE_TEXT deeper — slider numbers/ticks, readable on white
+SIDEBAR_BLUE = "#d4ebfb"
+BABY_BLUE = "#7fc4ee"
+BABY_BLUE_TEXT = "#2178a8"
 
 # How close to 0.0 or 1.0 counts as "sitting on the boundary" (i.e. probably
 # already clamped somewhere upstream) rather than a genuine interior prediction.
@@ -56,8 +65,13 @@ def _apply_theme_options() -> None:
     try:
         from streamlit import config as _st_config
 
-        _st_config.set_option("theme.primaryColor", ACCENT)
-        _st_config.set_option("theme.secondaryBackgroundColor", "#f2f4f7")
+        # primaryColor drives the slider's *filled* track and thumb, the toggle
+        # on-state, and focus rings — so baby blue here colors the sliders and
+        # toggles even where CSS can't reliably reach the filled track. Primary
+        # buttons are forced back to slate by the CSS below so their white text
+        # stays legible.
+        _st_config.set_option("theme.primaryColor", BABY_BLUE)
+        _st_config.set_option("theme.secondaryBackgroundColor", SIDEBAR_BLUE)
     except Exception:
         # Older/newer Streamlit, or config locked after server start.
         # The CSS overrides below cover the visible surfaces.
@@ -87,6 +101,9 @@ st.markdown(
         --aero-accent: {ACCENT};
         --aero-accent-hover: {ACCENT_HOVER};
         --aero-track-off: {TRACK_OFF};
+        --aero-sidebar: {SIDEBAR_BLUE};
+        --aero-baby: {BABY_BLUE};
+        --aero-baby-text: {BABY_BLUE_TEXT};
     }}
     </style>
     """,
@@ -141,10 +158,10 @@ st.markdown(
         opacity: 0.82;
     }
 
-    /* Force the sidebar to be smaller. Background switched from the pink
-       (#fcebec) to a neutral off-grey so the toggles no longer read as alerts. */
+    /* Force the sidebar to be smaller. Baby-blue background; kept paler than
+       the toggle "on" color so the toggles stay visible against it. */
     [data-testid="stSidebar"] {
-        background-color: #f2f4f7;
+        background-color: var(--aero-sidebar);
         min-width: 220px !important;
         max-width: 220px !important;
     }
@@ -157,13 +174,13 @@ st.markdown(
         white-space: nowrap;
     }
 
-    /* ---- Neutral accent for toggles ----
+    /* ---- Baby-blue toggles ----
        The toggle track is a span in some Streamlit versions and a div in
        others, so both are matched. aria-checked distinguishes on/off. */
     [data-baseweb="checkbox"] span[aria-checked="true"],
     [data-baseweb="checkbox"] div[aria-checked="true"],
     [data-testid="stCheckbox"] [aria-checked="true"] {
-        background-color: var(--aero-accent) !important;
+        background-color: var(--aero-baby) !important;
     }
     [data-baseweb="checkbox"] span[aria-checked="false"],
     [data-baseweb="checkbox"] div[aria-checked="false"],
@@ -176,17 +193,17 @@ st.markdown(
     }
     [data-baseweb="checkbox"] input:focus + div,
     [data-baseweb="checkbox"] [aria-checked]:focus-visible {
-        box-shadow: 0 0 0 3px rgba(63, 97, 132, 0.35) !important;
+        box-shadow: 0 0 0 3px rgba(127, 196, 238, 0.45) !important;
     }
 
-    /* ---- Neutral accent for sliders (AoA, amplitude, wavelength, carbon) ---- */
+    /* ---- Baby-blue sliders (AoA, amplitude, wavelength, carbon) ---- */
     [data-baseweb="slider"] [role="slider"] {
-        background-color: var(--aero-accent) !important;
-        border-color: var(--aero-accent) !important;
+        background-color: var(--aero-baby) !important;
+        border-color: var(--aero-baby) !important;
     }
     [data-baseweb="slider"] [data-testid="stThumbValue"],
     [data-testid="stTickBarMin"], [data-testid="stTickBarMax"] {
-        color: var(--aero-accent) !important;
+        color: var(--aero-baby-text) !important;
     }
 
     /* ---- Neutral accent for primary buttons ---- */
@@ -251,6 +268,30 @@ def get_model_metrics_safe() -> dict[str, float]:
     except Exception:
         score = get_model_r2()
         return {"r2": score} if score is not None else {}
+
+
+# Display order used by the metric dropdown and the reliability note.
+METRIC_KEYS = ("r2", "mae", "rmse")
+
+METRIC_LABELS = {
+    "r2": "Model R²",
+    "mae": "Model MAE",
+    "rmse": "Model RMSE",
+}
+
+# One-line plain-language reading of each metric, shown under the selected value.
+METRIC_HELP = {
+    "r2": "Share of test-set variation the model explains (1.00 is perfect). Higher is better.",
+    "mae": "Average error on held-out designs, in chord fraction. Lower is better.",
+    "rmse": "Like MAE but penalizes large misses more, in chord fraction. Lower is better.",
+}
+
+
+def format_metric_value(metric_key: str, value: float) -> str:
+    """R² is a bare 0–1 score; MAE/RMSE are chord fractions, shown with a unit."""
+    if metric_key == "r2":
+        return f"{value:.3f}"
+    return f"{value:.3f} x/c"
 
 
 def format_reliability_note(metrics: dict[str, float]) -> str:
@@ -790,13 +831,73 @@ if dark_mode:
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
         }
 
-        /* Inputs / select boxes */
+        /* Inputs / text areas keep the dark fill with light text. */
         input, textarea,
         [data-baseweb="input"] > div,
-        [data-baseweb="select"] > div,
         [data-baseweb="base-input"] {
             background-color: #262730 !important;
             color: #e6e6e6 !important;
+        }
+
+        /* ---- Captions / helper text ----
+           Streamlit renders captions as dimmed grey, which is hard to read on
+           a dark background. Force them to full-opacity white. */
+        [data-testid="stCaptionContainer"],
+        [data-testid="stCaptionContainer"] *,
+        .stCaption, .stCaption *,
+        small, .small-note {
+            color: #f5f5f5 !important;
+            opacity: 1 !important;
+        }
+
+        /* ---- Select / dropdown boxes ----
+           Requested black text. Black is only legible on a light fill, so the
+           closed control and its open menu both get a light background with
+           black text (rather than black text on the dark default, which would
+           be unreadable). */
+        [data-baseweb="select"] > div,
+        [data-baseweb="select"] div[role="button"] {
+            background-color: #eef4fa !important;
+            color: #000000 !important;
+        }
+        [data-baseweb="select"] > div *,
+        [data-baseweb="select"] div[role="button"] * {
+            color: #000000 !important;
+        }
+        /* The open menu popover is portaled to the body, outside the select. */
+        [data-baseweb="popover"] [role="option"],
+        [data-baseweb="popover"] [role="option"] *,
+        [data-baseweb="menu"] li,
+        [data-baseweb="menu"] li * {
+            background-color: #eef4fa !important;
+            color: #000000 !important;
+        }
+
+        /* ---- Preset buttons + other secondary buttons ----
+           Secondary buttons keep a light fill in dark mode, so their labels
+           must be dark to stay readable. This covers the four preset buttons
+           (Symmetric baseline, Cambered baseline, Biomimetic default, Workshop
+           challenge) as well as Clear history and the CSV download button.
+           Primary buttons are excluded — their white-on-slate text is handled
+           above. */
+        .stButton > button:not([kind="primary"]),
+        .stDownloadButton > button {
+            background-color: #eef4fa !important;
+        }
+        .stButton > button:not([kind="primary"]),
+        .stButton > button:not([kind="primary"]) *,
+        .stDownloadButton > button,
+        .stDownloadButton > button * {
+            color: #000000 !important;
+        }
+        /* Hold the black label on hover too (the light-mode hover rule would
+           otherwise recolor it). */
+        .stButton > button:not([kind="primary"]):hover,
+        .stButton > button:not([kind="primary"]):hover *,
+        .stDownloadButton > button:hover,
+        .stDownloadButton > button:hover * {
+            color: #000000 !important;
+            border-color: #7fc4ee !important;
         }
 
         /* JSON / code surfaces */
@@ -1013,12 +1114,35 @@ if show_prediction:
         clip_status = st.session_state.latest_clip_status
         raw_output = st.session_state.latest_raw_output
         baseline = st.session_state.latest_baseline
-        r2_value = get_model_r2()
+        metrics = get_model_metrics_safe()
+
+        # The middle metric column lets the user pick which validation metric to
+        # view. We only offer metrics that were actually found, so the dropdown
+        # never promises a value the model file doesn't provide.
+        available_metric_keys = [key for key in METRIC_KEYS if key in metrics]
 
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("Predicted separation_x_over_c", f"{prediction:.2f}")
         m_col1.caption("This is a screening estimate, not a measured value")
-        m_col2.metric("Model R²", f"{r2_value:.3f}" if r2_value is not None else "N/A")
+
+        with m_col2:
+            if available_metric_keys:
+                selected_metric = st.selectbox(
+                    "Validation metric",
+                    available_metric_keys,
+                    format_func=lambda key: METRIC_LABELS[key],
+                    key="selected_metric",
+                    label_visibility="collapsed",
+                )
+                st.metric(
+                    METRIC_LABELS[selected_metric],
+                    format_metric_value(selected_metric, metrics[selected_metric]),
+                )
+                st.caption(METRIC_HELP[selected_metric])
+            else:
+                st.metric("Model R²", "N/A")
+                st.caption("No validation metrics recorded (see below).")
+
         # Two decimals on x/c means one decimal here would be false precision.
         m_col3.metric("Separation location", f"{prediction * 100:.0f}% chord")
 
@@ -1029,8 +1153,9 @@ if show_prediction:
         )
 
         # Held-out validation metrics, so the number above is read with the
-        # model's actual accuracy in view rather than as an exact value.
-        metrics = get_model_metrics_safe()
+        # model's actual accuracy in view rather than as an exact value. The
+        # note always lists all available metrics; the dropdown above only
+        # changes which one is highlighted in the metric row.
         if metrics:
             st.caption(format_reliability_note(metrics))
 

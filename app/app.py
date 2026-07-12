@@ -52,7 +52,7 @@ TRACK_OFF = "#c8ccd4"       # unchecked toggle track (light mode)
 #   SIDEBAR_BLUE  soft, pale — the sidebar background
 #   BABY_BLUE     stronger fill — toggle "on" track, slider thumb + filled track
 #   BABY_BLUE_TEXT deeper — slider numbers/ticks, readable on white
-SIDEBAR_BLUE = "#d4ebfb"
+SIDEBAR_BLUE = "#eef3fb"    # white with a faint blue tint (sidebar background)
 BABY_BLUE = "#7fc4ee"
 BABY_BLUE_TEXT = "#2178a8"
 
@@ -158,8 +158,8 @@ st.markdown(
         opacity: 0.82;
     }
 
-    /* Force the sidebar to be smaller. Baby-blue background; kept paler than
-       the toggle "on" color so the toggles stay visible against it. */
+    /* Force the sidebar to be smaller. White with a faint blue tint; the
+       toggle "on" color is stronger so the toggles stay visible against it. */
     [data-testid="stSidebar"] {
         background-color: var(--aero-sidebar);
         min-width: 220px !important;
@@ -806,9 +806,19 @@ if dark_mode:
             color: #e6e6e6 !important;
         }
 
-        /* Sidebar */
+        /* Sidebar: white with a faint blue tint (requested). Kept very light so
+           the toggles and their labels stay legible against it. */
         [data-testid="stSidebar"] {
-            background-color: #1a1c22 !important;
+            background-color: #eef3fb !important;
+        }
+        /* On the light sidebar, force sidebar text back to dark so it stays
+           readable (the dark theme's global light-text rule would wash it out). */
+        [data-testid="stSidebar"] * {
+            color: #111111 !important;
+        }
+        /* Sidebar toggle OFF track: a mid grey reads clearly on the light panel. */
+        [data-testid="stSidebar"] [data-baseweb="checkbox"] [aria-checked="false"] {
+            background-color: #b9c2d0 !important;
         }
 
         /* Toggle track (off state) needs a darker neutral on dark backgrounds */
@@ -850,27 +860,69 @@ if dark_mode:
             opacity: 1 !important;
         }
 
-        /* ---- Select / dropdown boxes ----
+        /* ---- Select / dropdown boxes (closed control) ----
            Requested black text. Black is only legible on a light fill, so the
-           closed control and its open menu both get a light background with
-           black text (rather than black text on the dark default, which would
-           be unreadable). */
+           control gets a light background. BaseWeb nests the visible value a
+           few levels deep and sets its own colors inline, so we cast a wide net
+           and force every descendant dark. */
+        [data-baseweb="select"],
         [data-baseweb="select"] > div,
-        [data-baseweb="select"] div[role="button"] {
+        [data-baseweb="select"] > div > div,
+        [data-baseweb="select"] div[role="button"],
+        [data-baseweb="select"] [data-baseweb="base-input"] {
             background-color: #eef4fa !important;
-            color: #000000 !important;
         }
-        [data-baseweb="select"] > div *,
-        [data-baseweb="select"] div[role="button"] * {
-            color: #000000 !important;
+        [data-baseweb="select"] *,
+        [data-baseweb="select"] div[value],
+        [data-baseweb="select"] span,
+        [data-baseweb="select"] input {
+            color: #111111 !important;
+            -webkit-text-fill-color: #111111 !important;
         }
-        /* The open menu popover is portaled to the body, outside the select. */
+        /* The dropdown chevron/clear icons, kept dark so they show on the light fill. */
+        [data-baseweb="select"] svg {
+            fill: #111111 !important;
+            color: #111111 !important;
+        }
+
+        /* ---- Open dropdown menu ----
+           The popover is portaled to the <body>, outside stApp, so it is NOT
+           covered by the dark theme's text rules and needs its own. Each option
+           must be forced dark (BaseWeb dims non-highlighted options via inline
+           opacity/color) and the highlighted option needs a visible tint so it
+           is not white text on a near-white row. */
+        [data-baseweb="popover"] ul,
+        [data-baseweb="popover"] [role="listbox"],
+        [data-baseweb="menu"] {
+            background-color: #ffffff !important;
+        }
+        [data-baseweb="popover"] li,
+        [data-baseweb="popover"] [role="option"],
+        [data-baseweb="menu"] li,
+        [role="listbox"] [role="option"] {
+            background-color: #ffffff !important;
+        }
+        [data-baseweb="popover"] li,
+        [data-baseweb="popover"] li *,
         [data-baseweb="popover"] [role="option"],
         [data-baseweb="popover"] [role="option"] *,
         [data-baseweb="menu"] li,
-        [data-baseweb="menu"] li * {
-            background-color: #eef4fa !important;
-            color: #000000 !important;
+        [data-baseweb="menu"] li *,
+        [role="listbox"] [role="option"],
+        [role="listbox"] [role="option"] * {
+            color: #111111 !important;
+            -webkit-text-fill-color: #111111 !important;
+            opacity: 1 !important;
+        }
+        /* Highlighted / hovered / currently-selected option: light-blue row so
+           the dark text stays readable (the default was a near-white highlight
+           that hid the selected item). */
+        [data-baseweb="popover"] li:hover,
+        [data-baseweb="popover"] [role="option"]:hover,
+        [data-baseweb="popover"] [role="option"][aria-selected="true"],
+        [data-baseweb="menu"] li[aria-selected="true"],
+        [role="listbox"] [role="option"][aria-selected="true"] {
+            background-color: #cfe6fb !important;
         }
 
         /* ---- Preset buttons + other secondary buttons ----

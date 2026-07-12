@@ -806,19 +806,17 @@ if dark_mode:
             color: #e6e6e6 !important;
         }
 
-        /* Sidebar: white with a faint blue tint (requested). Kept very light so
-           the toggles and their labels stay legible against it. */
+        /* Sidebar: black in dark mode (overrides the light-mode blue tint). */
         [data-testid="stSidebar"] {
-            background-color: #eef3fb !important;
+            background-color: #0e1117 !important;
         }
-        /* On the light sidebar, force sidebar text back to dark so it stays
-           readable (the dark theme's global light-text rule would wash it out). */
+        /* Dark sidebar needs light text again. */
         [data-testid="stSidebar"] * {
-            color: #111111 !important;
+            color: #e6e6e6 !important;
         }
-        /* Sidebar toggle OFF track: a mid grey reads clearly on the light panel. */
+        /* Sidebar toggle OFF track: a darker neutral reads clearly on black. */
         [data-testid="stSidebar"] [data-baseweb="checkbox"] [aria-checked="false"] {
-            background-color: #b9c2d0 !important;
+            background-color: #3a3f4a !important;
         }
 
         /* Toggle track (off state) needs a darker neutral on dark backgrounds */

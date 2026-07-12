@@ -84,7 +84,7 @@ _apply_theme_options()
 # Page configuration
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Aero Toolkit",
+    page_title="WingCheck",
     page_icon="🛩️",
     layout="wide",
 )
@@ -554,7 +554,7 @@ if "entered" not in st.session_state:
 if not st.session_state.entered:
     st.markdown("<div style='height: 6vh;'></div>", unsafe_allow_html=True)
     st.markdown(
-        "<h1 style='text-align: center; font-size: 3rem;'>Welcome to Aero Toolkit</h1>",
+        "<h1 style='text-align: center; font-size: 3rem;'>Welcome to WingCheck</h1>",
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -576,7 +576,7 @@ if not st.session_state.entered:
     spacer_left, center_col, spacer_right = st.columns([1, 2, 1])
     with center_col:
         if st.button(
-            "Launch Aero Toolkit",
+            "Launch WingCheck",
             type="primary",
             use_container_width=True,
         ):
@@ -587,7 +587,7 @@ if not st.session_state.entered:
 # -----------------------------------------------------------------------------
 # App title and overview
 # -----------------------------------------------------------------------------
-st.title("Aero Toolkit: Biomimetic Wing Screening Tool")
+st.title("WingCheck: Biomimetic Wing Screening Tool")
 st.markdown(
     """
     This prototype uses a saved machine learning model to predict the flow separation
@@ -1312,7 +1312,7 @@ if show_prediction:
         st.download_button(
             "Download all prediction records (CSV)",
             data=history_df.to_csv(index=False).encode("utf-8"),
-            file_name="aero_toolkit_predictions.csv",
+            file_name="wingcheck_predictions.csv",
             mime="text/csv",
         )
     elif st.session_state.latest_prediction is None:

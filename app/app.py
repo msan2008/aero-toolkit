@@ -53,8 +53,11 @@ TRACK_OFF = "#c8ccd4"       # unchecked toggle track (light mode)
 #   BABY_BLUE     stronger fill — toggle "on" track, slider thumb + filled track
 #   BABY_BLUE_TEXT deeper — slider numbers/ticks, readable on white
 SIDEBAR_BLUE = "#eef3fb"    # white with a faint blue tint (sidebar background)
-BABY_BLUE = "#7fc4ee"
-BABY_BLUE_TEXT = "#2178a8"
+BABY_BLUE = "#7fc4ee"        # decorative fill (slider filled track)
+BABY_BLUE_ON = "#3f83b8"     # deeper blue for toggle "on" track — ~4.1:1 on white,
+                             # meeting WCAG 1.4.11 (3:1) for non-text UI state
+BABY_BLUE_TEXT = "#2178a8"   # slider numbers/ticks (readable on white)
+BABY_BLUE_EDGE = "#2f6a97"   # thumb/track outline so pale fills stay discernible
 
 # How close to 0.0 or 1.0 counts as "sitting on the boundary" (i.e. probably
 # already clamped somewhere upstream) rather than a genuine interior prediction.
@@ -103,6 +106,8 @@ st.markdown(
         --aero-track-off: {TRACK_OFF};
         --aero-sidebar: {SIDEBAR_BLUE};
         --aero-baby: {BABY_BLUE};
+        --aero-baby-on: {BABY_BLUE_ON};
+        --aero-baby-edge: {BABY_BLUE_EDGE};
         --aero-baby-text: {BABY_BLUE_TEXT};
     }}
     </style>
@@ -140,10 +145,12 @@ st.markdown(
 
     .main .block-container {
         padding-top: 2rem;
-        padding-bottom: 2rem;
-        padding-left: 9rem;
-        padding-right: 6rem;
-        max-width: 1040px;
+        padding-bottom: 3rem;
+        /* Symmetric, viewport-aware: comfortable on wide screens, collapses
+           gracefully on the laptops/tablets used in a live workshop. */
+        padding-left: clamp(1rem, 5vw, 4rem);
+        padding-right: clamp(1rem, 5vw, 4rem);
+        max-width: 1100px;
         margin: 0 auto;
     }
     .info-card {
@@ -158,12 +165,34 @@ st.markdown(
         opacity: 0.82;
     }
 
+    /* Workshop identity + numbered-step labels */
+    .mode-badge {
+        display: inline-block;
+        padding: 0.15rem 0.65rem;
+        border-radius: 999px;
+        background: var(--aero-baby);
+        color: #08344f !important;      /* ~7:1 on the pale blue pill */
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+    .step-eyebrow {
+        font-size: 0.82rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--aero-baby-text) !important;
+        margin: 0.4rem 0 0.2rem 0;
+    }
+
     /* Force the sidebar to be smaller. White with a faint blue tint; the
        toggle "on" color is stronger so the toggles stay visible against it. */
     [data-testid="stSidebar"] {
         background-color: var(--aero-sidebar);
-        min-width: 220px !important;
-        max-width: 220px !important;
+        /* A range, not a pin: 220px stayed brittle once help icons were added.
+           Still compact, but no longer prevents small adjustments. */
+        min-width: 210px !important;
+        max-width: 250px !important;
     }
 
     /* Sidebar toggle labels: single-word labels plus a slightly smaller size so
@@ -180,7 +209,7 @@ st.markdown(
     [data-baseweb="checkbox"] span[aria-checked="true"],
     [data-baseweb="checkbox"] div[aria-checked="true"],
     [data-testid="stCheckbox"] [aria-checked="true"] {
-        background-color: var(--aero-baby) !important;
+        background-color: var(--aero-baby-on) !important;
     }
     [data-baseweb="checkbox"] span[aria-checked="false"],
     [data-baseweb="checkbox"] div[aria-checked="false"],
@@ -199,7 +228,7 @@ st.markdown(
     /* ---- Baby-blue sliders (AoA, amplitude, wavelength, carbon) ---- */
     [data-baseweb="slider"] [role="slider"] {
         background-color: var(--aero-baby) !important;
-        border-color: var(--aero-baby) !important;
+        border: 2px solid var(--aero-baby-edge) !important;
     }
     [data-baseweb="slider"] [data-testid="stThumbValue"],
     [data-testid="stTickBarMin"], [data-testid="stTickBarMax"] {
@@ -554,7 +583,12 @@ if "entered" not in st.session_state:
 if not st.session_state.entered:
     st.markdown("<div style='height: 6vh;'></div>", unsafe_allow_html=True)
     st.markdown(
-        "<h1 style='text-align: center; font-size: 3rem;'>Welcome to WingCheck</h1>",
+        "<div style='text-align: center; margin-bottom: 0.4rem;'>"
+        "<span class='mode-badge'>Workshop Mode</span></div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<h1 style='text-align: center; font-size: 3rem; margin-top: 0.2rem;'>Welcome to WingCheck</h1>",
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -587,6 +621,7 @@ if not st.session_state.entered:
 # -----------------------------------------------------------------------------
 # App title and overview
 # -----------------------------------------------------------------------------
+st.markdown('<span class="mode-badge">Workshop Mode</span>', unsafe_allow_html=True)
 st.title("WingCheck: Biomimetic Wing Screening Tool")
 st.markdown(
     """
@@ -682,18 +717,22 @@ root_chord = 1.0
 tip_chord = 1.0
 sweep_angle = 0.0
 
+# --- Step 1: presets -------------------------------------------------------
 # Preset buttons must live outside the form: Streamlit only permits
 # st.form_submit_button inside a form block.
+st.markdown('<p class="step-eyebrow">Step 1 · Start from a preset</p>', unsafe_allow_html=True)
+st.caption("Each preset fills the inputs below with a known starting point. You can still adjust anything before running.")
+
 preset_cols = st.columns(len(PRESETS))
 for _col, _preset_name in zip(preset_cols, PRESETS):
     with _col:
         if st.button(_preset_name, use_container_width=True, key=f"preset_{_preset_name}"):
             apply_preset(_preset_name)
 
-st.caption(
-    f"Last preset applied: **{st.session_state.active_preset}**. "
-    "Presets fill the input bar below — you can still adjust any control before running."
-)
+st.caption(f"Last preset applied: **{st.session_state.active_preset}**.")
+
+# --- Step 2: inputs --------------------------------------------------------
+st.markdown('<p class="step-eyebrow">Step 2 · Adjust the wing and flow inputs</p>', unsafe_allow_html=True)
 
 # Wrapping the controls in a form means widget changes (especially dragging the
 # AoA slider) no longer trigger a rerun on every interaction. The script only
@@ -702,52 +741,55 @@ with st.form("input_form"):
     # Wrapper to apply tighter margins/labels via our custom CSS
     st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
 
-    # 7 columns for a highly condensed, single-bar layout
-    cols = st.columns([1.2, 1, 1, 0.8, 1.2, 1, 1])
-
+    # Flow / family row — three even columns that wrap cleanly on narrow screens.
     # Every widget below is driven by session_state via `key`, which is what
-    # lets the preset buttons populate them. Note that `value=`/`index=` are
-    # deliberately omitted: passing both a key and a default triggers a
-    # Streamlit warning about conflicting sources of truth.
-    with cols[0]:
+    # lets the preset buttons populate them. `value=`/`index=` are deliberately
+    # omitted: passing both a key and a default triggers a Streamlit warning
+    # about conflicting sources of truth.
+    flow_cols = st.columns(3)
+    with flow_cols[0]:
         airfoil_family = st.selectbox(
             "Airfoil Family",
             ["symmetric", "cambered", "biomimetic"],
             key="airfoil_family",
+            help="Wing section type. Choose 'biomimetic' to reveal the tubercle geometry controls.",
         )
-    with cols[1]:
+    with flow_cols[1]:
         angle_of_attack = st.slider(
             "AoA (°)", min_value=0.0, max_value=25.0, step=0.5, format="%.1f",
             key="angle_of_attack",
+            help="Angle of attack, in degrees. Limited to the model's training range (0–25°).",
         )
-    with cols[2]:
+    with flow_cols[2]:
         airspeed = st.selectbox(
             "Airspeed (m/s)",
             [15, 30],
             format_func=lambda v: f"{v} m/s",
             key="airspeed",
-        )
-    with cols[3]:
-        st.markdown(
-            "<div style='font-size:0.8rem; margin-top:0.4rem; opacity:0.8;'>"
-            "The sweep angle, root chord, and tip chord are fixed</div>",
-            unsafe_allow_html=True,
+            help="Freestream airspeed. Only the two speeds the model was trained on are offered.",
         )
 
+    st.caption("Sweep angle, root chord, and tip chord are fixed for this screening model.")
+
+    # Tubercle row — only shown for the biomimetic family.
     if airfoil_family == "biomimetic":
-        with cols[4]:
+        tub_cols = st.columns(3)
+        with tub_cols[0]:
             tubercle_shape = st.selectbox(
-                "Tubercle Shape", ["whale", "biomimetic_v1"], key="tubercle_shape"
+                "Tubercle Shape", ["whale", "biomimetic_v1"], key="tubercle_shape",
+                help="Leading-edge tubercle profile.",
             )
-        with cols[5]:
+        with tub_cols[1]:
             tubercle_amplitude = st.slider(
                 "Amplitude (mm)", min_value=26.2, max_value=32.7, step=0.1,
                 format="%.1f mm", key="tubercle_amplitude",
+                help="Tubercle height, in mm. Limited to the model's training range (26.2–32.7 mm).",
             )
-        with cols[6]:
+        with tub_cols[2]:
             tubercle_wavelength = st.slider(
                 "Wavelength (mm)", min_value=42.3, max_value=49.6, step=0.1,
                 format="%.1f mm", key="tubercle_wavelength",
+                help="Spacing between tubercles, in mm. Limited to the training range (42.3–49.6 mm).",
             )
     else:
         tubercle_shape = "none"
@@ -756,7 +798,9 @@ with st.form("input_form"):
 
     st.markdown('</div>', unsafe_allow_html=True)
     st.caption("Inputs are limited to the model's training range to avoid unsupported extrapolation.")
-    submitted = st.form_submit_button("Run Prediction", type="primary")
+
+    # --- Step 3: run -------------------------------------------------------
+    submitted = st.form_submit_button("Run Prediction", type="primary", use_container_width=True)
 
 st.markdown("---")
 
@@ -775,12 +819,35 @@ input_dict = {
 # -----------------------------------------------------------------------------
 # Sidebar Display Options
 # -----------------------------------------------------------------------------
-st.sidebar.header("Display Options")
-show_explanations = st.sidebar.toggle("Explanations", value=False)
-show_prediction = st.sidebar.toggle("Prediction", value=True)
-show_sustainability = st.sidebar.toggle("Sustainability", value=False)
-show_about = st.sidebar.toggle("About", value=False)
-dark_mode = st.sidebar.toggle("Dark Mode", value=False)
+# Workshop Mode identity + grouped controls. Variable names and defaults are
+# unchanged, so every downstream `if show_*:` block behaves exactly as before —
+# only the labeling and grouping changed.
+st.sidebar.markdown('<span class="mode-badge">Workshop Mode</span>', unsafe_allow_html=True)
+st.sidebar.caption("A guided, simplified view for classroom and workshop use.")
+
+st.sidebar.markdown("### Panels")
+show_prediction = st.sidebar.toggle(
+    "Prediction", value=True,
+    help="The core screening result. Recommended: keep this on.",
+)
+show_explanations = st.sidebar.toggle(
+    "Explanations", value=False,
+    help="What the tool can and cannot do, plus model diagnostics.",
+)
+show_sustainability = st.sidebar.toggle(
+    "Sustainability", value=False,
+    help="An educational what-if energy / CO₂ scenario calculator.",
+)
+show_about = st.sidebar.toggle(
+    "About", value=False,
+    help="About the tool and its creator.",
+)
+
+st.sidebar.markdown("### Appearance")
+dark_mode = st.sidebar.toggle(
+    "Dark Mode", value=False,
+    help="Switch to a dark colour theme.",
+)
 
 # Inject dark-theme overrides. This is rendered after the base style block, so
 # its rules win the cascade for the selectors they share.

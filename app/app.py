@@ -1475,3 +1475,11 @@ if show_about:
         "efficiency. He intends to continue his research and pursue his passion as an "
         "aerospace engineer."
     )
+
+    st.header("Contact & Links")
+    st.markdown(
+        "- **GitHub repository:** [github.com/msan2008/aero-toolkit]"
+        "(https://github.com/msan2008/aero-toolkit)\n"
+        "- **LinkedIn:** [Madhav S Anoop]"
+        "(https://www.linkedin.com/in/madhav-s-anoop/)"
+    )

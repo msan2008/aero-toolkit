@@ -619,7 +619,9 @@ def build_sustainability_table(
 #
 # Workshop Mode is currently the only mode, so the badge needs a companion line
 # explaining what the *other* mode would do — otherwise the fixed sweep/chord
-# inputs read as a limitation rather than a scoping decision.
+# inputs read as a limitation rather than a scoping decision. The badge and this
+# note live in the sidebar (and on the welcome screen) only; repeating them in
+# the main column said the same thing twice on one screen.
 # -----------------------------------------------------------------------------
 ADVANCED_MODE_NOTE = (
     "Advanced Mode with user-defined geometry is currently in development."
@@ -694,11 +696,6 @@ if not st.session_state.entered:
 # -----------------------------------------------------------------------------
 # App title and overview
 # -----------------------------------------------------------------------------
-st.markdown(
-    f'<span class="mode-badge">Workshop Mode</span>'
-    f'<p class="dev-note">{ADVANCED_MODE_NOTE}</p>',
-    unsafe_allow_html=True,
-)
 st.title("WingCheck: Biomimetic Wing Screening Tool")
 st.markdown(
     """
@@ -712,28 +709,31 @@ st.markdown(
 # -----------------------------------------------------------------------------
 # Start Here + progress guide
 #
-# The guide is open by default so first-time users land on the five steps; the
-# button lets returning users collapse it. st.rerun() is required because the
-# button's own label is read from session_state before the click is processed,
-# so without it the label would lag one interaction behind.
+# `started` gates the Model Prediction panel: on first load the user sees the
+# goal, the five steps, and the inputs, but no results surface until they
+# deliberately begin. The button disappears once pressed — it is a one-time
+# entry point, not a toggle, so leaving it on screen would invite a click that
+# does nothing.
 # -----------------------------------------------------------------------------
-if "show_guide" not in st.session_state:
-    st.session_state.show_guide = True
+if "started" not in st.session_state:
+    st.session_state.started = False
 
-start_col, goal_col = st.columns([1, 4])
-with start_col:
-    if st.button(
-        "Hide the guide" if st.session_state.show_guide else "Start Here",
-        type="primary",
-        use_container_width=True,
-    ):
-        st.session_state.show_guide = not st.session_state.show_guide
-        st.rerun()
-with goal_col:
+# Breathing room between the intro paragraph and the call to action.
+st.markdown("<div style='height: 1.6rem;'></div>", unsafe_allow_html=True)
+
+if not st.session_state.started:
+    start_col, goal_col = st.columns([1, 4])
+    with start_col:
+        if st.button("Start Here", type="primary", use_container_width=True):
+            st.session_state.started = True
+            st.rerun()
+    with goal_col:
+        st.markdown(GOAL_SENTENCE)
+else:
+    # The goal stays on screen as a standing reminder of what to optimize for.
     st.markdown(GOAL_SENTENCE)
 
-if st.session_state.show_guide:
-    render_progress_guide()
+render_progress_guide()
 
 # -----------------------------------------------------------------------------
 # Presets
@@ -905,6 +905,13 @@ with st.form("input_form"):
     # --- Step 3: run -------------------------------------------------------
     submitted = st.form_submit_button("Run Prediction", type="primary", use_container_width=True)
 
+# Running a prediction implies starting. Without this, a user who skipped the
+# Start Here button would click Run Prediction and see nothing happen. Set the
+# flag rather than st.rerun() here: a rerun would discard `submitted` and throw
+# the run away.
+if submitted:
+    st.session_state.started = True
+
 st.markdown("---")
 
 input_dict = {
@@ -924,7 +931,8 @@ input_dict = {
 # -----------------------------------------------------------------------------
 # Workshop Mode identity + grouped controls. Variable names and defaults are
 # unchanged, so every downstream `if show_*:` block behaves exactly as before —
-# only the labeling and grouping changed.
+# only the labeling and grouping changed. This is now the only place the mode
+# is named, which is also where the "why is geometry fixed?" question surfaces.
 st.sidebar.markdown('<span class="mode-badge">Workshop Mode</span>', unsafe_allow_html=True)
 st.sidebar.caption("A guided, simplified view for classroom and workshop use.")
 st.sidebar.caption(ADVANCED_MODE_NOTE)
@@ -1273,8 +1281,11 @@ if show_explanations:
 
 # -----------------------------------------------------------------------------
 # Prediction block
+#
+# Gated on `started`: results stay off screen until the user presses Start Here
+# (or runs a prediction directly, which sets the same flag above).
 # -----------------------------------------------------------------------------
-if show_prediction:
+if show_prediction and st.session_state.started:
     st.subheader("Model Prediction")
 
     st.caption("A later separation point, closer to x/c = 1, generally indicates more attached flow in this simplified screening context.")

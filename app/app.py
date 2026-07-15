@@ -63,6 +63,12 @@ BABY_BLUE_EDGE = "#2f6a97"   # thumb/track outline so pale fills stay discernibl
 # already clamped somewhere upstream) rather than a genuine interior prediction.
 CLIP_EPS = 1e-6
 
+# Held fixed for this screening model — the trained feature schema still expects
+# them, so they are named here rather than buried in the input dictionary.
+ROOT_CHORD = 1.0
+TIP_CHORD = 1.0
+SWEEP_ANGLE = 0.0
+
 
 def _apply_theme_options() -> None:
     try:
@@ -694,48 +700,6 @@ if not st.session_state.entered:
     st.stop()
 
 # -----------------------------------------------------------------------------
-# App title and overview
-# -----------------------------------------------------------------------------
-st.title("WingCheck: Biomimetic Wing Screening Tool")
-st.markdown(
-    """
-    This prototype uses a saved machine learning model to predict the flow separation
-    location, `separation_x_over_c`, from wing geometry and flow inputs. The goal is
-    to help students, makers, and robotics teams quickly screen wing ideas before
-    committing to more expensive CFD or wind-tunnel testing.
-    """
-)
-
-# -----------------------------------------------------------------------------
-# Start Here + progress guide
-#
-# `started` gates the Model Prediction panel: on first load the user sees the
-# goal, the five steps, and the inputs, but no results surface until they
-# deliberately begin. The button disappears once pressed — it is a one-time
-# entry point, not a toggle, so leaving it on screen would invite a click that
-# does nothing.
-# -----------------------------------------------------------------------------
-if "started" not in st.session_state:
-    st.session_state.started = False
-
-# Breathing room between the intro paragraph and the call to action.
-st.markdown("<div style='height: 1.6rem;'></div>", unsafe_allow_html=True)
-
-if not st.session_state.started:
-    start_col, goal_col = st.columns([1, 4])
-    with start_col:
-        if st.button("Start Here", type="primary", use_container_width=True):
-            st.session_state.started = True
-            st.rerun()
-    with goal_col:
-        st.markdown(GOAL_SENTENCE)
-else:
-    # The goal stays on screen as a standing reminder of what to optimize for.
-    st.markdown(GOAL_SENTENCE)
-
-render_progress_guide()
-
-# -----------------------------------------------------------------------------
 # Presets
 #
 # Each preset writes directly into the widget keys used by the input bar below.
@@ -794,7 +758,8 @@ if "active_preset" not in st.session_state:
 # setdefault (not direct assignment) so a user's manual edits survive reruns.
 # It also self-heals: Streamlit drops session_state entries for widgets that
 # were not rendered on the previous run, which is what happens to the tubercle
-# sliders whenever a non-biomimetic family is selected.
+# sliders whenever a non-biomimetic family is selected — and to every input
+# widget while the workflow is still hidden behind Start Here.
 for _key, _value in PRESETS[DEFAULT_PRESET].items():
     st.session_state.setdefault(_key, _value)
 
@@ -811,120 +776,168 @@ def apply_preset(name: str) -> None:
     st.session_state.active_preset = name
 
 
+def render_design_inputs() -> tuple[bool, dict]:
+    """Render Step 1 (presets) and Step 2 (the input form).
+
+    Returns (submitted, input_dict). Pulled into a function so the whole
+    workflow can be gated behind Start Here with a single branch rather than
+    indenting the entire input bar.
+    """
+    st.markdown("---")
+
+    # --- Step 1: presets ---------------------------------------------------
+    # Preset buttons must live outside the form: Streamlit only permits
+    # st.form_submit_button inside a form block.
+    st.markdown('<p class="step-eyebrow">Step 1 · Start from a preset</p>', unsafe_allow_html=True)
+    st.caption("Each preset fills the inputs below with a known starting point. You can still adjust anything before running.")
+
+    preset_cols = st.columns(len(PRESETS))
+    for _col, _preset_name in zip(preset_cols, PRESETS):
+        with _col:
+            if st.button(_preset_name, use_container_width=True, key=f"preset_{_preset_name}"):
+                apply_preset(_preset_name)
+
+    st.caption(f"Last preset applied: **{st.session_state.active_preset}**.")
+
+    # --- Step 2: inputs ----------------------------------------------------
+    st.markdown('<p class="step-eyebrow">Step 2 · Adjust the wing and flow inputs</p>', unsafe_allow_html=True)
+
+    # Wrapping the controls in a form means widget changes (especially dragging
+    # the AoA slider) no longer trigger a rerun on every interaction. The script
+    # only reruns when the user clicks the submit button below.
+    with st.form("input_form"):
+        # Wrapper to apply tighter margins/labels via our custom CSS
+        st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
+
+        # Flow / family row — three even columns that wrap cleanly on narrow
+        # screens. Every widget below is driven by session_state via `key`,
+        # which is what lets the preset buttons populate them. `value=`/`index=`
+        # are deliberately omitted: passing both a key and a default triggers a
+        # Streamlit warning about conflicting sources of truth.
+        flow_cols = st.columns(3)
+        with flow_cols[0]:
+            airfoil_family = st.selectbox(
+                "Airfoil Family",
+                ["symmetric", "cambered", "biomimetic"],
+                key="airfoil_family",
+                help="Wing section type. Choose 'biomimetic' to reveal the tubercle geometry controls.",
+            )
+        with flow_cols[1]:
+            angle_of_attack = st.slider(
+                "AoA (°)", min_value=0.0, max_value=25.0, step=0.5, format="%.1f",
+                key="angle_of_attack",
+                help="Angle of attack, in degrees. Limited to the model's training range (0–25°).",
+            )
+        with flow_cols[2]:
+            airspeed = st.selectbox(
+                "Airspeed (m/s)",
+                [15, 30],
+                format_func=lambda v: f"{v} m/s",
+                key="airspeed",
+                help="Freestream airspeed. Only the two speeds the model was trained on are offered.",
+            )
+
+        st.caption("Sweep angle, root chord, and tip chord are fixed for this screening model.")
+
+        # Tubercle row — only shown for the biomimetic family.
+        if airfoil_family == "biomimetic":
+            tub_cols = st.columns(3)
+            with tub_cols[0]:
+                tubercle_shape = st.selectbox(
+                    "Tubercle Shape", ["whale", "biomimetic_v1"], key="tubercle_shape",
+                    help="Leading-edge tubercle profile.",
+                )
+            with tub_cols[1]:
+                tubercle_amplitude = st.slider(
+                    "Amplitude (mm)", min_value=26.2, max_value=32.7, step=0.1,
+                    format="%.1f mm", key="tubercle_amplitude",
+                    help="Tubercle height, in mm. Limited to the model's training range (26.2–32.7 mm).",
+                )
+            with tub_cols[2]:
+                tubercle_wavelength = st.slider(
+                    "Wavelength (mm)", min_value=42.3, max_value=49.6, step=0.1,
+                    format="%.1f mm", key="tubercle_wavelength",
+                    help="Spacing between tubercles, in mm. Limited to the training range (42.3–49.6 mm).",
+                )
+        else:
+            tubercle_shape = "none"
+            tubercle_amplitude = 0.0
+            tubercle_wavelength = 0.0
+
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.caption("Inputs are limited to the model's training range to avoid unsupported extrapolation.")
+
+        # --- Step 3: run ---------------------------------------------------
+        submitted = st.form_submit_button("Run Prediction", type="primary", use_container_width=True)
+
+    st.markdown("---")
+
+    payload = {
+        "airfoil_family": airfoil_family,
+        "tubercle_amplitude": tubercle_amplitude,
+        "tubercle_wavelength": tubercle_wavelength,
+        "tubercle_shape": tubercle_shape,
+        "root_chord": ROOT_CHORD,
+        "tip_chord": TIP_CHORD,
+        "sweep_angle": SWEEP_ANGLE,
+        "angle_of_attack": angle_of_attack,
+        "airspeed": airspeed,
+    }
+    return submitted, payload
+
+
 # -----------------------------------------------------------------------------
-# Top Input Bar (Condensed Single Row, batched inside a form)
+# App title and overview
 # -----------------------------------------------------------------------------
-st.markdown("---")
+st.title("WingCheck: Biomimetic Wing Screening Tool")
+st.markdown(
+    """
+    This prototype uses a saved machine learning model to predict the flow separation
+    location, `separation_x_over_c`, from wing geometry and flow inputs. The goal is
+    to help students, makers, and robotics teams quickly screen wing ideas before
+    committing to more expensive CFD or wind-tunnel testing.
+    """
+)
 
-root_chord = 1.0
-tip_chord = 1.0
-sweep_angle = 0.0
+# -----------------------------------------------------------------------------
+# Start Here + progress guide
+#
+# `started` gates the whole workflow — presets, the input form, Run Prediction,
+# and the results. On first load the user sees only the goal and the five steps,
+# so the landing screen is an orientation rather than a wall of controls. The
+# button disappears once pressed: it is a one-time entry point, not a toggle, so
+# leaving it on screen would invite a click that does nothing.
+# -----------------------------------------------------------------------------
+if "started" not in st.session_state:
+    st.session_state.started = False
 
-# --- Step 1: presets -------------------------------------------------------
-# Preset buttons must live outside the form: Streamlit only permits
-# st.form_submit_button inside a form block.
-st.markdown('<p class="step-eyebrow">Step 1 · Start from a preset</p>', unsafe_allow_html=True)
-st.caption("Each preset fills the inputs below with a known starting point. You can still adjust anything before running.")
+# Breathing room between the intro paragraph and the call to action.
+st.markdown("<div style='height: 1.6rem;'></div>", unsafe_allow_html=True)
 
-preset_cols = st.columns(len(PRESETS))
-for _col, _preset_name in zip(preset_cols, PRESETS):
-    with _col:
-        if st.button(_preset_name, use_container_width=True, key=f"preset_{_preset_name}"):
-            apply_preset(_preset_name)
+if not st.session_state.started:
+    start_col, goal_col = st.columns([1, 4])
+    with start_col:
+        if st.button("Start Here", type="primary", use_container_width=True):
+            st.session_state.started = True
+            st.rerun()
+    with goal_col:
+        st.markdown(GOAL_SENTENCE)
+else:
+    # The goal stays on screen as a standing reminder of what to optimize for.
+    st.markdown(GOAL_SENTENCE)
 
-st.caption(f"Last preset applied: **{st.session_state.active_preset}**.")
+render_progress_guide()
 
-# --- Step 2: inputs --------------------------------------------------------
-st.markdown('<p class="step-eyebrow">Step 2 · Adjust the wing and flow inputs</p>', unsafe_allow_html=True)
-
-# Wrapping the controls in a form means widget changes (especially dragging the
-# AoA slider) no longer trigger a rerun on every interaction. The script only
-# reruns when the user clicks the submit button below.
-with st.form("input_form"):
-    # Wrapper to apply tighter margins/labels via our custom CSS
-    st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
-
-    # Flow / family row — three even columns that wrap cleanly on narrow screens.
-    # Every widget below is driven by session_state via `key`, which is what
-    # lets the preset buttons populate them. `value=`/`index=` are deliberately
-    # omitted: passing both a key and a default triggers a Streamlit warning
-    # about conflicting sources of truth.
-    flow_cols = st.columns(3)
-    with flow_cols[0]:
-        airfoil_family = st.selectbox(
-            "Airfoil Family",
-            ["symmetric", "cambered", "biomimetic"],
-            key="airfoil_family",
-            help="Wing section type. Choose 'biomimetic' to reveal the tubercle geometry controls.",
-        )
-    with flow_cols[1]:
-        angle_of_attack = st.slider(
-            "AoA (°)", min_value=0.0, max_value=25.0, step=0.5, format="%.1f",
-            key="angle_of_attack",
-            help="Angle of attack, in degrees. Limited to the model's training range (0–25°).",
-        )
-    with flow_cols[2]:
-        airspeed = st.selectbox(
-            "Airspeed (m/s)",
-            [15, 30],
-            format_func=lambda v: f"{v} m/s",
-            key="airspeed",
-            help="Freestream airspeed. Only the two speeds the model was trained on are offered.",
-        )
-
-    st.caption("Sweep angle, root chord, and tip chord are fixed for this screening model.")
-
-    # Tubercle row — only shown for the biomimetic family.
-    if airfoil_family == "biomimetic":
-        tub_cols = st.columns(3)
-        with tub_cols[0]:
-            tubercle_shape = st.selectbox(
-                "Tubercle Shape", ["whale", "biomimetic_v1"], key="tubercle_shape",
-                help="Leading-edge tubercle profile.",
-            )
-        with tub_cols[1]:
-            tubercle_amplitude = st.slider(
-                "Amplitude (mm)", min_value=26.2, max_value=32.7, step=0.1,
-                format="%.1f mm", key="tubercle_amplitude",
-                help="Tubercle height, in mm. Limited to the model's training range (26.2–32.7 mm).",
-            )
-        with tub_cols[2]:
-            tubercle_wavelength = st.slider(
-                "Wavelength (mm)", min_value=42.3, max_value=49.6, step=0.1,
-                format="%.1f mm", key="tubercle_wavelength",
-                help="Spacing between tubercles, in mm. Limited to the training range (42.3–49.6 mm).",
-            )
-    else:
-        tubercle_shape = "none"
-        tubercle_amplitude = 0.0
-        tubercle_wavelength = 0.0
-
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.caption("Inputs are limited to the model's training range to avoid unsupported extrapolation.")
-
-    # --- Step 3: run -------------------------------------------------------
-    submitted = st.form_submit_button("Run Prediction", type="primary", use_container_width=True)
-
-# Running a prediction implies starting. Without this, a user who skipped the
-# Start Here button would click Run Prediction and see nothing happen. Set the
-# flag rather than st.rerun() here: a rerun would discard `submitted` and throw
-# the run away.
-if submitted:
-    st.session_state.started = True
-
-st.markdown("---")
-
-input_dict = {
-    "airfoil_family": airfoil_family,
-    "tubercle_amplitude": tubercle_amplitude,
-    "tubercle_wavelength": tubercle_wavelength,
-    "tubercle_shape": tubercle_shape,
-    "root_chord": root_chord,
-    "tip_chord": tip_chord,
-    "sweep_angle": sweep_angle,
-    "angle_of_attack": angle_of_attack,
-    "airspeed": airspeed,
-}
+# -----------------------------------------------------------------------------
+# Workflow (hidden until Start Here)
+#
+# `input_dict` is None while hidden, which is the signal the panels below use to
+# skip anything that depends on live inputs.
+# -----------------------------------------------------------------------------
+if st.session_state.started:
+    submitted, input_dict = render_design_inputs()
+else:
+    submitted, input_dict = False, None
 
 # -----------------------------------------------------------------------------
 # Sidebar Display Options
@@ -1226,7 +1239,12 @@ if show_explanations:
 
     with st.expander("Model and input diagnostics"):
         st.write("Current input dictionary:")
-        st.json(input_dict)
+        # None until Start Here is pressed — the input widgets do not exist yet,
+        # so there is nothing to show.
+        if input_dict is None:
+            st.info("Click **Start Here** above to build an input dictionary.")
+        else:
+            st.json(input_dict)
         st.write("Expected model feature order:")
         st.write(get_required_feature_columns())
 
@@ -1282,8 +1300,8 @@ if show_explanations:
 # -----------------------------------------------------------------------------
 # Prediction block
 #
-# Gated on `started`: results stay off screen until the user presses Start Here
-# (or runs a prediction directly, which sets the same flag above).
+# Gated on `started` alongside the inputs it reports on: there is nothing
+# coherent to show before the user has any controls to run.
 # -----------------------------------------------------------------------------
 if show_prediction and st.session_state.started:
     st.subheader("Model Prediction")

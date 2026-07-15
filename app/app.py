@@ -185,6 +185,46 @@ st.markdown(
         margin: 0.4rem 0 0.2rem 0;
     }
 
+    /* ---- Progress guide + development note ----
+       The guide is a real sequence (each step depends on the previous one), so
+       the numbered markers carry information rather than decorate. */
+    .dev-note {
+        font-size: 0.85rem;
+        opacity: 0.85;
+        margin: 0.35rem 0 0 0;
+    }
+    .guide-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0.25rem 0 0.9rem 0;
+    }
+    .guide-step {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+        border: 1px solid rgba(49, 51, 63, 0.15);
+        background: rgba(240, 242, 246, 0.45);
+        font-size: 0.9rem;
+    }
+    /* Colour is deliberately not set on .guide-step: letting the base `div`
+       rule supply it means the dark-mode `div` override applies for free. */
+    .guide-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.45rem;
+        height: 1.45rem;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--aero-baby-on);
+        color: #ffffff !important;   /* class beats the base `span` rule */
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
     /* Force the sidebar to be smaller. White with a faint blue tint; the
        toggle "on" color is stronger so the toggles stay visible against it. */
     [data-testid="stSidebar"] {
@@ -575,6 +615,38 @@ def build_sustainability_table(
 
 
 # -----------------------------------------------------------------------------
+# Workshop Mode framing
+#
+# Workshop Mode is currently the only mode, so the badge needs a companion line
+# explaining what the *other* mode would do — otherwise the fixed sweep/chord
+# inputs read as a limitation rather than a scoping decision.
+# -----------------------------------------------------------------------------
+ADVANCED_MODE_NOTE = (
+    "Advanced Mode with user-defined geometry is currently in development."
+)
+GOAL_SENTENCE = (
+    "Your goal is to explore wing settings that delay predicted flow separation "
+    "as far back along the chord as possible."
+)
+GUIDE_STEPS = (
+    "Choose a preset or wing design",
+    "Adjust the inputs",
+    "Run the prediction",
+    "Interpret the result",
+    "Compare or download the design",
+)
+
+
+def render_progress_guide() -> None:
+    """Render the five-step workshop flow as a compact chip strip."""
+    chips = "".join(
+        f'<div class="guide-step"><span class="guide-num">{i}</span>{text}</div>'
+        for i, text in enumerate(GUIDE_STEPS, start=1)
+    )
+    st.markdown(f'<div class="guide-strip">{chips}</div>', unsafe_allow_html=True)
+
+
+# -----------------------------------------------------------------------------
 # Welcome page
 # -----------------------------------------------------------------------------
 if "entered" not in st.session_state:
@@ -584,7 +656,8 @@ if not st.session_state.entered:
     st.markdown("<div style='height: 6vh;'></div>", unsafe_allow_html=True)
     st.markdown(
         "<div style='text-align: center; margin-bottom: 0.4rem;'>"
-        "<span class='mode-badge'>Workshop Mode</span></div>",
+        "<span class='mode-badge'>Workshop Mode</span>"
+        f"<p class='dev-note'>{ADVANCED_MODE_NOTE}</p></div>",
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -621,7 +694,11 @@ if not st.session_state.entered:
 # -----------------------------------------------------------------------------
 # App title and overview
 # -----------------------------------------------------------------------------
-st.markdown('<span class="mode-badge">Workshop Mode</span>', unsafe_allow_html=True)
+st.markdown(
+    f'<span class="mode-badge">Workshop Mode</span>'
+    f'<p class="dev-note">{ADVANCED_MODE_NOTE}</p>',
+    unsafe_allow_html=True,
+)
 st.title("WingCheck: Biomimetic Wing Screening Tool")
 st.markdown(
     """
@@ -631,6 +708,32 @@ st.markdown(
     committing to more expensive CFD or wind-tunnel testing.
     """
 )
+
+# -----------------------------------------------------------------------------
+# Start Here + progress guide
+#
+# The guide is open by default so first-time users land on the five steps; the
+# button lets returning users collapse it. st.rerun() is required because the
+# button's own label is read from session_state before the click is processed,
+# so without it the label would lag one interaction behind.
+# -----------------------------------------------------------------------------
+if "show_guide" not in st.session_state:
+    st.session_state.show_guide = True
+
+start_col, goal_col = st.columns([1, 4])
+with start_col:
+    if st.button(
+        "Hide the guide" if st.session_state.show_guide else "Start Here",
+        type="primary",
+        use_container_width=True,
+    ):
+        st.session_state.show_guide = not st.session_state.show_guide
+        st.rerun()
+with goal_col:
+    st.markdown(GOAL_SENTENCE)
+
+if st.session_state.show_guide:
+    render_progress_guide()
 
 # -----------------------------------------------------------------------------
 # Presets
@@ -824,6 +927,7 @@ input_dict = {
 # only the labeling and grouping changed.
 st.sidebar.markdown('<span class="mode-badge">Workshop Mode</span>', unsafe_allow_html=True)
 st.sidebar.caption("A guided, simplified view for classroom and workshop use.")
+st.sidebar.caption(ADVANCED_MODE_NOTE)
 
 st.sidebar.markdown("### Panels")
 show_prediction = st.sidebar.toggle(
@@ -904,6 +1008,20 @@ if dark_mode:
         .info-card {
             background: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+
+        /* Progress guide chips: same treatment as the info cards. The step text
+           inherits #e6e6e6 from the `div` rule above; only the numbered marker
+           needs an explicit override, since its class-level white would
+           otherwise be the same colour as the chip fill it sits on. */
+        .guide-step {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+        .guide-num { color: #ffffff !important; }
+        .dev-note {
+            color: #f5f5f5 !important;
+            opacity: 0.85 !important;
         }
 
         /* Inputs / text areas keep the dark fill with light text. */

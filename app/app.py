@@ -1488,43 +1488,47 @@ if show_sustainability:
         
         st.markdown("#### Interactive Scenario Calculator")
         
-        calc_col1, calc_col2 = st.columns(2)
-        with calc_col1:
-            energy_per_flight_wh = st.number_input(
-                "Estimated energy per flight (Wh)",
-                min_value=1.0,
-                max_value=100000.0,
-                value=100.0,
-                step=10.0,
-                help=HELP_ENERGY_PER_FLIGHT,
-            )
-            carbon_factor_kg_per_kwh = st.slider(
-                "Carbon factor (kg CO₂/kWh)",
-                min_value=0.0,
-                max_value=2.0,
-                value=0.40,
-                step=0.01,
-                help=HELP_CARBON_FACTOR,
-            )
-        with calc_col2:
-            number_of_flights = st.number_input(
-                "Number of flights",
-                min_value=1,
-                max_value=100000,
-                value=100,
-                step=10,
-                help=HELP_NUMBER_OF_FLIGHTS,
-            )
-            efficiency_gain_percent = st.slider(
-                "Assumed efficiency gain (%)", 
-                min_value=1.0, 
-                max_value=20.0, 
-                value=5.0, 
-                step=0.5,
-                help="Hypothetical percentage reduction in energy usage due to delayed flow separation."
-            )
+        # Added form for sustainability update button functionality
+        with st.form("sustainability_calc_form"):
+            calc_col1, calc_col2 = st.columns(2)
+            with calc_col1:
+                energy_per_flight_wh = st.number_input(
+                    "Estimated energy per flight (Wh)",
+                    min_value=1.0,
+                    max_value=100000.0,
+                    value=100.0,
+                    step=10.0,
+                    help=HELP_ENERGY_PER_FLIGHT,
+                )
+                carbon_factor_kg_per_kwh = st.slider(
+                    "Carbon factor (kg CO₂/kWh)",
+                    min_value=0.0,
+                    max_value=2.0,
+                    value=0.40,
+                    step=0.01,
+                    help=HELP_CARBON_FACTOR,
+                )
+            with calc_col2:
+                number_of_flights = st.number_input(
+                    "Number of flights",
+                    min_value=1,
+                    max_value=100000,
+                    value=100,
+                    step=10,
+                    help=HELP_NUMBER_OF_FLIGHTS,
+                )
+                efficiency_gain_percent = st.slider(
+                    "Assumed efficiency gain (%)", 
+                    min_value=1.0, 
+                    max_value=20.0, 
+                    value=5.0, 
+                    step=0.5,
+                    help="Hypothetical percentage reduction in energy usage due to delayed flow separation."
+                )
 
-        # Dynamic Calculations
+            update_sustainability = st.form_submit_button("Update Calculations")
+
+        # Dynamic Calculations (Runs on initial render and explicitly on form submisson)
         total_energy_kwh = (energy_per_flight_wh * number_of_flights) / 1000.0
         saved_kwh = total_energy_kwh * (efficiency_gain_percent / 100.0)
         avoided_kg_co2 = saved_kwh * carbon_factor_kg_per_kwh
@@ -1577,9 +1581,9 @@ if show_about:
     )
 
     st.header("Contact & Links")
-    st.markdown(
-        "- **GitHub repository:** [github.com/msan2008/aero-toolkit]"
-        "(https://github.com/msan2008/aero-toolkit)\n"
-        "- **LinkedIn:** [Madhav S Anoop]"
-        "(https://www.linkedin.com/in/madhav-s-anoop/)"
-    )
+    # Utilizing Streamlit's native st.link_button for a clean, visual element
+    link_col1, link_col2, _ = st.columns([1, 1, 2])
+    with link_col1:
+        st.link_button("View GitHub Repository", "https://github.com/msan2008/aero-toolkit", use_container_width=True)
+    with link_col2:
+        st.link_button("Connect on LinkedIn", "https://www.linkedin.com/in/madhav-s-anoop/", use_container_width=True)

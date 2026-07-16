@@ -1,4 +1,5 @@
 import sys
+import random
 from datetime import datetime
 from pathlib import Path
 
@@ -37,36 +38,22 @@ except ImportError:
 
 # -----------------------------------------------------------------------------
 # Theme accent (self-contained, no .streamlit/config.toml required)
-#
-# Streamlit's default primaryColor is #FF4B4B, a red that drives the toggle
-# fills, primary buttons, slider handles, and focus rings. Normally you would
-# change it in .streamlit/config.toml. To keep everything in this single file,
-# we set the same option at runtime. This touches a semi-private API, so it is
-# wrapped in try/except: if it fails on a given Streamlit version, the CSS
-# block further down still repaints the visible controls.
 # -----------------------------------------------------------------------------
 ACCENT = "#3f6184"          # slate blue — used for primary buttons (needs
 ACCENT_HOVER = "#34506d"    # enough contrast for white button text)
 TRACK_OFF = "#c8ccd4"       # unchecked toggle track (light mode)
 
-# Baby-blue palette for the sidebar, toggles, and sliders. Three shades so the
-# on-state toggle stays visible against the sidebar it sits on:
-#   SIDEBAR_BLUE  soft, pale — the sidebar background
-#   BABY_BLUE     stronger fill — toggle "on" track, slider thumb + filled track
-#   BABY_BLUE_TEXT deeper — slider numbers/ticks, readable on white
+# Baby-blue palette for the sidebar, toggles, and sliders.
 SIDEBAR_BLUE = "#eef3fb"    # white with a faint blue tint (sidebar background)
 BABY_BLUE = "#7fc4ee"        # decorative fill (slider filled track)
-BABY_BLUE_ON = "#3f83b8"     # deeper blue for toggle "on" track — ~4.1:1 on white,
-                             # meeting WCAG 1.4.11 (3:1) for non-text UI state
+BABY_BLUE_ON = "#3f83b8"     # deeper blue for toggle "on" track 
 BABY_BLUE_TEXT = "#2178a8"   # slider numbers/ticks (readable on white)
 BABY_BLUE_EDGE = "#2f6a97"   # thumb/track outline so pale fills stay discernible
 
-# How close to 0.0 or 1.0 counts as "sitting on the boundary" (i.e. probably
-# already clamped somewhere upstream) rather than a genuine interior prediction.
+# How close to 0.0 or 1.0 counts as "sitting on the boundary"
 CLIP_EPS = 1e-6
 
-# Held fixed for this screening model — the trained feature schema still expects
-# them, so they are named here rather than buried in the input dictionary.
+# Held fixed for this screening model
 ROOT_CHORD = 1.0
 TIP_CHORD = 1.0
 SWEEP_ANGLE = 0.0
@@ -75,17 +62,9 @@ SWEEP_ANGLE = 0.0
 def _apply_theme_options() -> None:
     try:
         from streamlit import config as _st_config
-
-        # primaryColor drives the slider's *filled* track and thumb, the toggle
-        # on-state, and focus rings — so baby blue here colors the sliders and
-        # toggles even where CSS can't reliably reach the filled track. Primary
-        # buttons are forced back to slate by the CSS below so their white text
-        # stays legible.
         _st_config.set_option("theme.primaryColor", BABY_BLUE)
         _st_config.set_option("theme.secondaryBackgroundColor", SIDEBAR_BLUE)
     except Exception:
-        # Older/newer Streamlit, or config locked after server start.
-        # The CSS overrides below cover the visible surfaces.
         pass
 
 
@@ -103,8 +82,6 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 # Lightweight styling
 # -----------------------------------------------------------------------------
-# The accent is exposed to CSS as custom properties so the Python constants
-# above remain the single source of truth for the color.
 st.markdown(
     f"""
     <style>
@@ -128,9 +105,6 @@ st.markdown(
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
-    /* Base size bumped from the 16px default to 19px (+3pt). Because Streamlit
-       sizes most text in rem, this scales the whole type hierarchy up together
-       while preserving the relative sizes of headings vs. body text. */
     html { font-size: 19px; }
 
     html, body, [class*="css"], .stApp,
@@ -154,8 +128,6 @@ st.markdown(
     .main .block-container {
         padding-top: 2rem;
         padding-bottom: 3rem;
-        /* Symmetric, viewport-aware: comfortable on wide screens, collapses
-           gracefully on the laptops/tablets used in a live workshop. */
         padding-left: clamp(1rem, 5vw, 4rem);
         padding-right: clamp(1rem, 5vw, 4rem);
         max-width: 1100px;
@@ -173,13 +145,12 @@ st.markdown(
         opacity: 0.82;
     }
 
-    /* Workshop identity + numbered-step labels */
     .mode-badge {
         display: inline-block;
         padding: 0.15rem 0.65rem;
         border-radius: 999px;
         background: var(--aero-baby);
-        color: #08344f !important;      /* ~7:1 on the pale blue pill */
+        color: #08344f !important;
         font-size: 0.8rem;
         font-weight: 600;
         letter-spacing: 0.02em;
@@ -193,9 +164,6 @@ st.markdown(
         margin: 0.4rem 0 0.2rem 0;
     }
 
-    /* ---- Progress guide + development note ----
-       The guide is a real sequence (each step depends on the previous one), so
-       the numbered markers carry information rather than decorate. */
     .dev-note {
         font-size: 0.85rem;
         opacity: 0.85;
@@ -217,8 +185,6 @@ st.markdown(
         background: rgba(240, 242, 246, 0.45);
         font-size: 0.9rem;
     }
-    /* Colour is deliberately not set on .guide-step: letting the base `div`
-       rule supply it means the dark-mode `div` override applies for free. */
     .guide-num {
         display: inline-flex;
         align-items: center;
@@ -228,32 +194,22 @@ st.markdown(
         flex: 0 0 auto;
         border-radius: 999px;
         background: var(--aero-baby-on);
-        color: #ffffff !important;   /* class beats the base `span` rule */
+        color: #ffffff !important;
         font-size: 0.8rem;
         font-weight: 600;
     }
 
-    /* Force the sidebar to be smaller. White with a faint blue tint; the
-       toggle "on" color is stronger so the toggles stay visible against it. */
     [data-testid="stSidebar"] {
         background-color: var(--aero-sidebar);
-        /* A range, not a pin: 220px stayed brittle once help icons were added.
-           Still compact, but no longer prevents small adjustments. */
         min-width: 210px !important;
         max-width: 250px !important;
     }
-
-    /* Sidebar toggle labels: single-word labels plus a slightly smaller size so
-       they never wrap onto a second line at the 220px sidebar width. */
     [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
     [data-testid="stSidebar"] label p {
         font-size: 0.9rem !important;
         white-space: nowrap;
     }
 
-    /* ---- Baby-blue toggles ----
-       The toggle track is a span in some Streamlit versions and a div in
-       others, so both are matched. aria-checked distinguishes on/off. */
     [data-baseweb="checkbox"] span[aria-checked="true"],
     [data-baseweb="checkbox"] div[aria-checked="true"],
     [data-testid="stCheckbox"] [aria-checked="true"] {
@@ -264,7 +220,6 @@ st.markdown(
     [data-testid="stCheckbox"] [aria-checked="false"] {
         background-color: var(--aero-track-off) !important;
     }
-    /* The knob itself stays white on both tracks. */
     [data-baseweb="checkbox"] [aria-checked] > div {
         background-color: #ffffff !important;
     }
@@ -273,7 +228,6 @@ st.markdown(
         box-shadow: 0 0 0 3px rgba(127, 196, 238, 0.45) !important;
     }
 
-    /* ---- Baby-blue sliders (AoA, amplitude, wavelength, carbon) ---- */
     [data-baseweb="slider"] [role="slider"] {
         background-color: var(--aero-baby) !important;
         border: 2px solid var(--aero-baby-edge) !important;
@@ -283,7 +237,6 @@ st.markdown(
         color: var(--aero-baby-text) !important;
     }
 
-    /* ---- Neutral accent for primary buttons ---- */
     .stButton > button[kind="primary"],
     .stFormSubmitButton > button[kind="primary"],
     [data-testid="stFormSubmitButton"] > button {
@@ -303,8 +256,6 @@ st.markdown(
         border-color: var(--aero-accent-hover) !important;
     }
 
-    /* Secondary buttons ("Clear history", CSV download) turn red on hover by
-       default; keep them on the same neutral accent. */
     .stButton > button:not([kind="primary"]):hover,
     .stDownloadButton > button:hover {
         border-color: var(--aero-accent) !important;
@@ -315,11 +266,9 @@ st.markdown(
         color: var(--aero-accent) !important;
     }
 
-    /* Links and focus rings */
     a, a:visited { color: var(--aero-accent) !important; }
     *:focus-visible { outline-color: var(--aero-accent) !important; }
 
-    /* Condense the labels in the top input bar */
     .condensed-label label {
         font-size: 0.85rem !important;
         margin-bottom: 0px !important;
@@ -331,12 +280,6 @@ st.markdown(
 
 # -----------------------------------------------------------------------------
 # Hover help text
-#
-# Every technical control gets a definition, not a restatement of its label. A
-# participant who does not already know what "angle of attack" means should be
-# able to learn it from the tooltip without leaving the app. These live as
-# module constants because several are reused (separation_x_over_c is described
-# in two places, and the geometry terms echo the wing diagram's labels).
 # -----------------------------------------------------------------------------
 HELP_AIRFOIL_FAMILY = (
     "The cross-section shape of the wing. **Symmetric**: identical curvature above "
@@ -412,21 +355,13 @@ HELP_DIAGRAM_TOGGLE = (
 # Helper functions
 # -----------------------------------------------------------------------------
 def get_model_metrics_safe() -> dict[str, float]:
-    """Return held-out validation metrics, or {} if none are recorded.
-
-    Falls back to the R^2-only API when running against an older
-    src/inference.py that predates get_model_metrics().
-    """
     try:
         from src.inference import get_model_metrics  # type: ignore  # noqa: E402
-
         return {k: float(v) for k, v in get_model_metrics().items() if v is not None}
     except Exception:
         score = get_model_r2()
         return {"r2": score} if score is not None else {}
 
-
-# Display order used by the metric dropdown and the reliability note.
 METRIC_KEYS = ("r2", "mae", "rmse")
 
 METRIC_LABELS = {
@@ -435,23 +370,19 @@ METRIC_LABELS = {
     "rmse": "Model RMSE",
 }
 
-# One-line plain-language reading of each metric, shown under the selected value.
 METRIC_HELP = {
     "r2": "Share of test-set variation the model explains (1.00 is perfect). Higher is better.",
     "mae": "Average error on held-out designs, in chord fraction. Lower is better.",
     "rmse": "Like MAE but penalizes large misses more, in chord fraction. Lower is better.",
 }
 
-
 def format_metric_value(metric_key: str, value: float) -> str:
-    """R² is a bare 0–1 score; MAE/RMSE are chord fractions, shown with a unit."""
     if metric_key == "r2":
         return f"{value:.3f}"
     return f"{value:.3f} x/c"
 
 
 def format_reliability_note(metrics: dict[str, float]) -> str:
-    """Build a one-line held-out performance summary from whatever is available."""
     parts = []
     if "r2" in metrics:
         parts.append(f"R² = {metrics['r2']:.3f}")
@@ -462,8 +393,6 @@ def format_reliability_note(metrics: dict[str, float]) -> str:
 
     note = "**Model reliability (held-out test set):** " + " · ".join(parts)
 
-    # MAE is in units of chord fraction, so it converts directly into the
-    # "how wrong is this number likely to be" statement users actually want.
     if "mae" in metrics:
         note += (
             f". On unseen designs the model is typically off by about "
@@ -474,15 +403,8 @@ def format_reliability_note(metrics: dict[str, float]) -> str:
 
 
 def get_model_r2() -> float | None:
-    """Return the trained model's R^2 score if the inference layer exposes one.
-
-    This tries to read the value from src/inference.py so the displayed score
-    stays in sync with the saved model. If no score is available, it returns
-    None and the UI shows "N/A" instead of crashing.
-    """
     try:
         from src.inference import get_model_r2_score  # type: ignore  # noqa: E402
-
         score = get_model_r2_score()
         return float(score) if score is not None else None
     except Exception:
@@ -490,22 +412,6 @@ def get_model_r2() -> float | None:
 
 
 def evaluate_clipping(raw_prediction: float) -> tuple[float, str | None]:
-    """Clamp a model output to the physical range [0, 1] and report why.
-
-    `separation_x_over_c` is a normalized chord position, so values outside
-    [0, 1] are physically meaningless — a regressor is free to produce them
-    under extrapolation.
-
-    Returns (bounded_value, status). Status is None for a clean interior
-    prediction, otherwise:
-
-      "clamped_low"/"clamped_high"  : the raw output was outside [0, 1].
-      "at_lower_bound"/"at_upper_bound"
-          : the value is exactly on a boundary. When the raw output is
-            available this is a genuine saturated prediction; when it is not
-            (older src/inference.py, which clips internally), it means the
-            value was clamped upstream and the true output is unknown.
-    """
     if raw_prediction < 0.0:
         return 0.0, "clamped_low"
     if raw_prediction > 1.0:
@@ -518,7 +424,6 @@ def evaluate_clipping(raw_prediction: float) -> tuple[float, str | None]:
 
 
 def clipping_message(status: str, raw_prediction: float) -> str:
-    """Explain a clipping status in workshop-appropriate language."""
     if status == "clamped_high":
         return (
             f"The model returned {raw_prediction:.3f}, which would place separation past the "
@@ -548,14 +453,6 @@ def clipping_message(status: str, raw_prediction: float) -> str:
 
 
 def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
-    """Labelled reference planform (top view) for the vocabulary the inputs use.
-
-    This is a *terminology* diagram, not a rendering of the current design.
-    Sweep and taper are drawn deliberately so that "sweep angle" and "tip chord"
-    have something to point at — this screening model holds sweep at 0° and root
-    chord = tip chord. The caption beneath says so, so the picture is never read
-    as the wing the user just configured.
-    """
     if dark_mode:
         bg_color = "#0e1117"
         fg_color = "#e6e6e6"
@@ -569,8 +466,6 @@ def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
         edge_color = "#3f6184"
         accent_color = "#2178a8"
 
-    # x is spanwise (0 = root, 1 = tip); y is chordwise, 0 at the root leading
-    # edge with negative values running aft toward the trailing edge.
     span = 1.0
     root_le, root_te = 0.0, -1.0
     tip_le, tip_te = -0.35, -0.95
@@ -578,10 +473,8 @@ def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(5.5, 4.4))
     fig.patch.set_facecolor(bg_color)
     ax.set_facecolor(bg_color)
-    ax.set_aspect("equal")  # a geometry diagram with a distorted angle is a lie
+    ax.set_aspect("equal") 
 
-    # Wing outline, drawn with a straight leading edge; the tubercle wave is
-    # overlaid on top of it below.
     ax.fill(
         [0, span, span, 0],
         [root_le, tip_le, tip_te, root_te],
@@ -591,11 +484,10 @@ def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
         zorder=1,
     )
 
-    # ---- Tubercles: a sine wave running along the leading edge --------------
     le_vec = np.array([span, tip_le - root_le])
     le_len = float(np.linalg.norm(le_vec))
     le_dir = le_vec / le_len
-    le_normal = np.array([-le_dir[1], le_dir[0]])  # perpendicular, pointing forward
+    le_normal = np.array([-le_dir[1], le_dir[0]]) 
 
     t = np.linspace(0.0, 1.0, 400)
     wave = 0.035 * np.sin(2 * np.pi * 7 * t)
@@ -606,7 +498,6 @@ def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
     )
     ax.plot(le_points[:, 0], le_points[:, 1], color=accent_color, linewidth=2.2, zorder=3)
 
-    # ---- Chord dimensions ---------------------------------------------------
     ax.annotate(
         "", xy=(-0.10, root_le), xytext=(-0.10, root_te),
         arrowprops=dict(arrowstyle="<->", color=fg_color, lw=1.2),
@@ -625,7 +516,6 @@ def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
         rotation=90, ha="center", va="center", color=fg_color, fontsize=9,
     )
 
-    # ---- Sweep angle: reference line, arc, label ----------------------------
     ax.plot([0, 0.62], [0, 0], linestyle="--", linewidth=1.0, color=fg_color, alpha=0.6, zorder=2)
     le_angle_deg = float(np.degrees(np.arctan2(tip_le - root_le, span)))
     ax.add_patch(
@@ -634,7 +524,6 @@ def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
     )
     ax.text(0.68, -0.11, "Sweep angle", ha="left", va="center", color=fg_color, fontsize=9)
 
-    # ---- Edge + tubercle callouts ------------------------------------------
     ax.annotate(
         "Leading edge", xy=(0.18, -0.063), xytext=(-0.50, 0.36),
         arrowprops=dict(arrowstyle="->", color=fg_color, lw=1.0),
@@ -671,7 +560,7 @@ def plot_airfoil_and_separation(
     else:
         bg_color = "white"
         fg_color = "black"
-        line_color = None  # use matplotlib defaults to keep light mode unchanged
+        line_color = None
         marker_color = None
 
     fig, ax = plt.subplots(figsize=(8, 3))
@@ -694,8 +583,6 @@ def plot_airfoil_and_separation(
     ax.text(0.0, -0.11, "Leading edge", ha="left", va="top", fontsize=9, color=fg_color)
     ax.text(1.0, -0.11, "Trailing edge", ha="right", va="top", fontsize=9, color=fg_color)
 
-    # Optional symmetric-baseline reference, drawn muted so the selected design
-    # stays visually dominant.
     if baseline_x_over_c is not None:
         baseline_color = "#8a8f98" if not dark_mode else "#9aa0a8"
         ax.axvline(baseline_x_over_c, linestyle=":", linewidth=1.5, color=baseline_color)
@@ -723,7 +610,6 @@ def plot_airfoil_and_separation(
 
 
 def run_single_prediction(payload: dict) -> dict:
-    """Predict once and return the rounded value plus clipping provenance."""
     if HAS_RAW_PREDICTION:
         model_output = float(predict_raw_from_dict(payload))
     else:
@@ -737,13 +623,6 @@ def run_single_prediction(payload: dict) -> dict:
 
 
 def build_symmetric_baseline_inputs(payload: dict) -> dict:
-    """Return the same flow condition on a plain symmetric wing.
-
-    Airspeed, angle of attack, chords, and sweep are held fixed; only the
-    airfoil family and the tubercle geometry change. That makes the comparison
-    a like-for-like question: at this exact flow condition, what does the
-    tubercle geometry buy you?
-    """
     baseline = dict(payload)
     baseline["airfoil_family"] = "symmetric"
     baseline["tubercle_shape"] = "none"
@@ -753,9 +632,6 @@ def build_symmetric_baseline_inputs(payload: dict) -> dict:
 
 
 def describe_baseline_delta(delta: float) -> str:
-    """Plain-language reading of (biomimetic - symmetric) separation location."""
-    # Below one rounding unit, the two predictions are indistinguishable at the
-    # precision this app displays. Claiming a difference would be false precision.
     if abs(delta) < 0.01:
         return (
             "The model predicts effectively the same separation location for both wings "
@@ -814,12 +690,6 @@ def build_sustainability_table(
 
 # -----------------------------------------------------------------------------
 # Workshop Mode framing
-#
-# Workshop Mode is currently the only mode, so the badge needs a companion line
-# explaining what the *other* mode would do — otherwise the fixed sweep/chord
-# inputs read as a limitation rather than a scoping decision. The badge and this
-# note live in the sidebar (and on the welcome screen) only; repeating them in
-# the main column said the same thing twice on one screen.
 # -----------------------------------------------------------------------------
 ADVANCED_MODE_NOTE = (
     "Advanced Mode with user-defined geometry is currently in development."
@@ -838,7 +708,6 @@ GUIDE_STEPS = (
 
 
 def render_progress_guide() -> None:
-    """Render the five-step workshop flow as a compact chip strip."""
     chips = "".join(
         f'<div class="guide-step"><span class="guide-num">{i}</span>{text}</div>'
         for i, text in enumerate(GUIDE_STEPS, start=1)
@@ -894,13 +763,6 @@ if not st.session_state.entered:
 # -----------------------------------------------------------------------------
 # Sidebar Display Options
 # -----------------------------------------------------------------------------
-# Rendered before the main column even though it appears to the left of it:
-# Streamlit executes top to bottom, and the input bar now needs `show_diagram`
-# and `dark_mode`. It still sits below the welcome page's st.stop(), so the
-# launch screen stays chrome-free.
-#
-# Workshop Mode identity + grouped controls. This is the only place the mode is
-# named, which is also where the "why is the geometry fixed?" question surfaces.
 st.sidebar.markdown('<span class="mode-badge">Workshop Mode</span>', unsafe_allow_html=True)
 st.sidebar.caption("A guided, simplified view for classroom and workshop use.")
 st.sidebar.caption(ADVANCED_MODE_NOTE)
@@ -913,6 +775,10 @@ show_prediction = st.sidebar.toggle(
 show_diagram = st.sidebar.toggle(
     "Diagram", value=True,
     help=HELP_DIAGRAM_TOGGLE,
+)
+show_comparison = st.sidebar.toggle(
+    "Compare Designs", value=False,
+    help="Compare saved predictions side-by-side.",
 )
 show_explanations = st.sidebar.toggle(
     "Explanations", value=False,
@@ -933,219 +799,8 @@ dark_mode = st.sidebar.toggle(
     help="Switch to a dark colour theme.",
 )
 
-# Inject dark-theme overrides. This is rendered after the base style block, so
-# its rules win the cascade for the selectors they share.
-if dark_mode:
-    st.markdown(
-        """
-        <style>
-        /* ---- Aero Toolkit dark mode ---- */
-        .stApp, [data-testid="stAppViewContainer"] {
-            background-color: #0e1117 !important;
-        }
-        [data-testid="stHeader"] {
-            background-color: rgba(14, 17, 23, 0) !important;
-        }
-
-        /* Light text overrides the forced-black base rule */
-        html, body, [class*="css"], .stApp,
-        .stMarkdown, .stText,
-        h1, h2, h3, h4, h5, h6, p, span, label, div,
-        button, input, select, textarea,
-        [data-testid="stMetricValue"],
-        [data-testid="stMetricLabel"] {
-            color: #e6e6e6 !important;
-        }
-
-        /* Sidebar: black in dark mode (overrides the light-mode blue tint). */
-        [data-testid="stSidebar"] {
-            background-color: #0e1117 !important;
-        }
-        /* Dark sidebar needs light text again. */
-        [data-testid="stSidebar"] * {
-            color: #e6e6e6 !important;
-        }
-        /* Sidebar toggle OFF track: a darker neutral reads clearly on black. */
-        [data-testid="stSidebar"] [data-baseweb="checkbox"] [aria-checked="false"] {
-            background-color: #3a3f4a !important;
-        }
-
-        /* Toggle track (off state) needs a darker neutral on dark backgrounds */
-        [data-baseweb="checkbox"] [aria-checked="false"] {
-            background-color: #3a3f4a !important;
-        }
-        [data-baseweb="checkbox"] [aria-checked="true"] {
-            background-color: #5b86b3 !important;
-        }
-
-        /* Primary buttons keep white label text on the accent fill */
-        .stButton > button[kind="primary"] *,
-        .stFormSubmitButton > button[kind="primary"] * {
-            color: #ffffff !important;
-        }
-
-        /* Info cards */
-        .info-card {
-            background: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        }
-
-        /* Progress guide chips: same treatment as the info cards. The step text
-           inherits #e6e6e6 from the `div` rule above; only the numbered marker
-           needs an explicit override, since its class-level white would
-           otherwise be the same colour as the chip fill it sits on. */
-        .guide-step {
-            background: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        }
-        .guide-num { color: #ffffff !important; }
-        .dev-note {
-            color: #f5f5f5 !important;
-            opacity: 0.85 !important;
-        }
-
-        /* Inputs / text areas keep the dark fill with light text. */
-        input, textarea,
-        [data-baseweb="input"] > div,
-        [data-baseweb="base-input"] {
-            background-color: #262730 !important;
-            color: #e6e6e6 !important;
-        }
-
-        /* ---- Captions / helper text ----
-           Streamlit renders captions as dimmed grey, which is hard to read on
-           a dark background. Force them to full-opacity white. */
-        [data-testid="stCaptionContainer"],
-        [data-testid="stCaptionContainer"] *,
-        .stCaption, .stCaption *,
-        small, .small-note {
-            color: #f5f5f5 !important;
-            opacity: 1 !important;
-        }
-
-        /* ---- Select / dropdown boxes (closed control) ----
-           Requested black text. Black is only legible on a light fill, so the
-           control gets a light background. BaseWeb nests the visible value a
-           few levels deep and sets its own colors inline, so we cast a wide net
-           and force every descendant dark. */
-        [data-baseweb="select"],
-        [data-baseweb="select"] > div,
-        [data-baseweb="select"] > div > div,
-        [data-baseweb="select"] div[role="button"],
-        [data-baseweb="select"] [data-baseweb="base-input"] {
-            background-color: #eef4fa !important;
-        }
-        [data-baseweb="select"] *,
-        [data-baseweb="select"] div[value],
-        [data-baseweb="select"] span,
-        [data-baseweb="select"] input {
-            color: #111111 !important;
-            -webkit-text-fill-color: #111111 !important;
-        }
-        /* The dropdown chevron/clear icons, kept dark so they show on the light fill. */
-        [data-baseweb="select"] svg {
-            fill: #111111 !important;
-            color: #111111 !important;
-        }
-
-        /* ---- Open dropdown menu ----
-           The popover is portaled to the <body>, outside stApp, so it is NOT
-           covered by the dark theme's text rules and needs its own. Each option
-           must be forced dark (BaseWeb dims non-highlighted options via inline
-           opacity/color) and the highlighted option needs a visible tint so it
-           is not white text on a near-white row. */
-        [data-baseweb="popover"] ul,
-        [data-baseweb="popover"] [role="listbox"],
-        [data-baseweb="menu"] {
-            background-color: #ffffff !important;
-        }
-        [data-baseweb="popover"] li,
-        [data-baseweb="popover"] [role="option"],
-        [data-baseweb="menu"] li,
-        [role="listbox"] [role="option"] {
-            background-color: #ffffff !important;
-        }
-        [data-baseweb="popover"] li,
-        [data-baseweb="popover"] li *,
-        [data-baseweb="popover"] [role="option"],
-        [data-baseweb="popover"] [role="option"] *,
-        [data-baseweb="menu"] li,
-        [data-baseweb="menu"] li *,
-        [role="listbox"] [role="option"],
-        [role="listbox"] [role="option"] * {
-            color: #111111 !important;
-            -webkit-text-fill-color: #111111 !important;
-            opacity: 1 !important;
-        }
-        /* Highlighted / hovered / currently-selected option: light-blue row so
-           the dark text stays readable (the default was a near-white highlight
-           that hid the selected item). */
-        [data-baseweb="popover"] li:hover,
-        [data-baseweb="popover"] [role="option"]:hover,
-        [data-baseweb="popover"] [role="option"][aria-selected="true"],
-        [data-baseweb="menu"] li[aria-selected="true"],
-        [role="listbox"] [role="option"][aria-selected="true"] {
-            background-color: #cfe6fb !important;
-        }
-
-        /* ---- Preset buttons + other secondary buttons ----
-           Secondary buttons keep a light fill in dark mode, so their labels
-           must be dark to stay readable. This covers the four preset buttons
-           (Symmetric baseline, Cambered baseline, Biomimetic default, Workshop
-           challenge) as well as Clear history and the CSV download button.
-           Primary buttons are excluded — their white-on-slate text is handled
-           above. */
-        .stButton > button:not([kind="primary"]),
-        .stDownloadButton > button {
-            background-color: #eef4fa !important;
-        }
-        .stButton > button:not([kind="primary"]),
-        .stButton > button:not([kind="primary"]) *,
-        .stDownloadButton > button,
-        .stDownloadButton > button * {
-            color: #000000 !important;
-        }
-        /* Hold the black label on hover too (the light-mode hover rule would
-           otherwise recolor it). */
-        .stButton > button:not([kind="primary"]):hover,
-        .stButton > button:not([kind="primary"]):hover *,
-        .stDownloadButton > button:hover,
-        .stDownloadButton > button:hover * {
-            color: #000000 !important;
-            border-color: #7fc4ee !important;
-        }
-
-        /* JSON / code surfaces */
-        [data-testid="stJson"], pre, code {
-            background-color: #1c1f26 !important;
-        }
-
-        /* Alerts (info / success / warning) made readable on dark */
-        [data-testid="stAlert"], .stAlert {
-            background-color: rgba(255, 255, 255, 0.07) !important;
-        }
-
-        /* Expander */
-        [data-testid="stExpander"] details {
-            background-color: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        }
-
-        /* Dividers */
-        hr { border-color: rgba(255, 255, 255, 0.15) !important; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
 # -----------------------------------------------------------------------------
-# Presets
-#
-# Each preset writes directly into the widget keys used by the input bar below.
-# Tubercle values are always stored inside the sliders' valid ranges (even for
-# the non-biomimetic presets) so the sliders never re-render with an
-# out-of-bounds value; the "none"/0.0 substitution happens later, when the
-# input dictionary is assembled.
+# Preset & Action Handlers
 # -----------------------------------------------------------------------------
 PRESETS: dict[str, dict] = {
     "Symmetric baseline": {
@@ -1172,10 +827,6 @@ PRESETS: dict[str, dict] = {
         "tubercle_amplitude": 26.2,
         "tubercle_wavelength": 49.6,
     },
-    # A deliberately hard case: a plain symmetric section at a high angle of
-    # attack and low airspeed. Separation should be predicted early, giving
-    # workshop participants a design to improve — the intended move is to
-    # switch the family to biomimetic and tune the tubercle geometry.
     "Workshop challenge": {
         "airfoil_family": "symmetric",
         "angle_of_attack": 20.0,
@@ -1186,47 +837,154 @@ PRESETS: dict[str, dict] = {
     },
 }
 
-# Biomimetic is the default because the project is centered on biomimicry, and
-# workshop users should see the tubercle controls on first load. Change this
-# one string to "Symmetric baseline" to start from the flat-plate comparison.
 DEFAULT_PRESET = "Biomimetic default"
 
 if "active_preset" not in st.session_state:
     st.session_state.active_preset = DEFAULT_PRESET
 
-# setdefault (not direct assignment) so a user's manual edits survive reruns.
-# It also self-heals: Streamlit drops session_state entries for widgets that
-# were not rendered on the previous run, which is what happens to the tubercle
-# sliders whenever a non-biomimetic family is selected — and to every input
-# widget while the workflow is still hidden behind Start Here.
 for _key, _value in PRESETS[DEFAULT_PRESET].items():
     st.session_state.setdefault(_key, _value)
 
-
 def apply_preset(name: str) -> None:
-    """Write a preset into the widget keys.
-
-    This runs before the input widgets are instantiated on the current script
-    run, so no explicit st.rerun() is needed: the button click already
-    triggered the rerun, and the widgets pick these values up as they render.
-    """
     for key, value in PRESETS[name].items():
         st.session_state[key] = value
     st.session_state.active_preset = name
 
+def apply_random_design() -> None:
+    """Generate a random supported wing configuration."""
+    st.session_state["airfoil_family"] = random.choice(["symmetric", "cambered", "biomimetic"])
+    st.session_state["angle_of_attack"] = round(random.uniform(0.0, 25.0) * 2) / 2 # Step 0.5
+    st.session_state["airspeed"] = random.choice([15, 30])
+    
+    if st.session_state["airfoil_family"] == "biomimetic":
+        st.session_state["tubercle_shape"] = random.choice(["whale", "biomimetic_v1"])
+        st.session_state["tubercle_amplitude"] = round(random.uniform(26.2, 32.7), 1)
+        st.session_state["tubercle_wavelength"] = round(random.uniform(42.3, 49.6), 1)
+    else:
+        st.session_state["tubercle_shape"] = "none"
+        st.session_state["tubercle_amplitude"] = 0.0
+        st.session_state["tubercle_wavelength"] = 0.0
+        
+    st.session_state.active_preset = "Random Design"
+
+def reset_workshop() -> None:
+    """Clear history and return to default settings."""
+    apply_preset(DEFAULT_PRESET)
+    st.session_state.prediction_history = []
+    st.session_state.latest_prediction = None
+    st.session_state.latest_input_dict = None
+    st.session_state.latest_label = None
+    st.session_state.latest_clip_status = None
+    st.session_state.latest_raw_output = None
+    st.session_state.latest_baseline = None
+
+st.sidebar.markdown("### Actions")
+if st.sidebar.button("Reset Workshop", use_container_width=True, help="Clear history and return to default settings."):
+    reset_workshop()
+    st.rerun()
+
+if st.sidebar.button("🎲 Random Design", use_container_width=True, help="Generate a random supported wing configuration."):
+    apply_random_design()
+    st.rerun()
+
+# Inject dark-theme overrides
+if dark_mode:
+    st.markdown(
+        """
+        <style>
+        .stApp, [data-testid="stAppViewContainer"] { background-color: #0e1117 !important; }
+        [data-testid="stHeader"] { background-color: rgba(14, 17, 23, 0) !important; }
+        html, body, [class*="css"], .stApp, .stMarkdown, .stText,
+        h1, h2, h3, h4, h5, h6, p, span, label, div, button, input, select, textarea,
+        [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
+            color: #e6e6e6 !important;
+        }
+        [data-testid="stSidebar"] { background-color: #0e1117 !important; }
+        [data-testid="stSidebar"] * { color: #e6e6e6 !important; }
+        [data-testid="stSidebar"] [data-baseweb="checkbox"] [aria-checked="false"] {
+            background-color: #3a3f4a !important;
+        }
+        [data-baseweb="checkbox"] [aria-checked="false"] { background-color: #3a3f4a !important; }
+        [data-baseweb="checkbox"] [aria-checked="true"] { background-color: #5b86b3 !important; }
+        .stButton > button[kind="primary"] *, .stFormSubmitButton > button[kind="primary"] * {
+            color: #ffffff !important;
+        }
+        .info-card {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+        .guide-step {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+        .guide-num { color: #ffffff !important; }
+        .dev-note { color: #f5f5f5 !important; opacity: 0.85 !important; }
+        input, textarea, [data-baseweb="input"] > div, [data-baseweb="base-input"] {
+            background-color: #262730 !important;
+            color: #e6e6e6 !important;
+        }
+        [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] *,
+        .stCaption, .stCaption *, small, .small-note {
+            color: #f5f5f5 !important;
+            opacity: 1 !important;
+        }
+        [data-baseweb="select"], [data-baseweb="select"] > div, [data-baseweb="select"] > div > div,
+        [data-baseweb="select"] div[role="button"], [data-baseweb="select"] [data-baseweb="base-input"] {
+            background-color: #eef4fa !important;
+        }
+        [data-baseweb="select"] *, [data-baseweb="select"] div[value], [data-baseweb="select"] span,
+        [data-baseweb="select"] input {
+            color: #111111 !important;
+            -webkit-text-fill-color: #111111 !important;
+        }
+        [data-baseweb="select"] svg { fill: #111111 !important; color: #111111 !important; }
+        [data-baseweb="popover"] ul, [data-baseweb="popover"] [role="listbox"], [data-baseweb="menu"] {
+            background-color: #ffffff !important;
+        }
+        [data-baseweb="popover"] li, [data-baseweb="popover"] [role="option"],
+        [data-baseweb="menu"] li, [role="listbox"] [role="option"] {
+            background-color: #ffffff !important;
+        }
+        [data-baseweb="popover"] li, [data-baseweb="popover"] li *,
+        [data-baseweb="popover"] [role="option"], [data-baseweb="popover"] [role="option"] *,
+        [data-baseweb="menu"] li, [data-baseweb="menu"] li *, [role="listbox"] [role="option"],
+        [role="listbox"] [role="option"] * {
+            color: #111111 !important;
+            -webkit-text-fill-color: #111111 !important;
+            opacity: 1 !important;
+        }
+        [data-baseweb="popover"] li:hover, [data-baseweb="popover"] [role="option"]:hover,
+        [data-baseweb="popover"] [role="option"][aria-selected="true"],
+        [data-baseweb="menu"] li[aria-selected="true"], [role="listbox"] [role="option"][aria-selected="true"] {
+            background-color: #cfe6fb !important;
+        }
+        .stButton > button:not([kind="primary"]), .stDownloadButton > button {
+            background-color: #eef4fa !important;
+        }
+        .stButton > button:not([kind="primary"]), .stButton > button:not([kind="primary"]) *,
+        .stDownloadButton > button, .stDownloadButton > button * {
+            color: #000000 !important;
+        }
+        .stButton > button:not([kind="primary"]):hover, .stButton > button:not([kind="primary"]):hover *,
+        .stDownloadButton > button:hover, .stDownloadButton > button:hover * {
+            color: #000000 !important;
+            border-color: #7fc4ee !important;
+        }
+        [data-testid="stJson"], pre, code { background-color: #1c1f26 !important; }
+        [data-testid="stAlert"], .stAlert { background-color: rgba(255, 255, 255, 0.07) !important; }
+        [data-testid="stExpander"] details {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        }
+        hr { border-color: rgba(255, 255, 255, 0.15) !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def render_design_inputs(show_diagram: bool, dark_mode: bool) -> tuple[bool, dict]:
-    """Render Step 1 (presets) and Step 2 (the input form + wing diagram).
-
-    Returns (submitted, input_dict). Pulled into a function so the whole
-    workflow can be gated behind Start Here with a single branch rather than
-    indenting the entire input bar.
-    """
     st.markdown("---")
 
-    # --- Step 1: presets ---------------------------------------------------
-    # Preset buttons must live outside the form: Streamlit only permits
-    # st.form_submit_button inside a form block.
     st.markdown('<p class="step-eyebrow">Step 1 · Start from a preset</p>', unsafe_allow_html=True)
     st.caption("Each preset fills the inputs below with a known starting point. You can still adjust anything before running.")
 
@@ -1238,31 +996,17 @@ def render_design_inputs(show_diagram: bool, dark_mode: bool) -> tuple[bool, dic
 
     st.caption(f"Last preset applied: **{st.session_state.active_preset}**.")
 
-    # --- Step 2: inputs ----------------------------------------------------
     st.markdown('<p class="step-eyebrow">Step 2 · Adjust the wing and flow inputs</p>', unsafe_allow_html=True)
 
-    # The diagram sits beside the controls so the vocabulary is visible while
-    # the terms are being used. When hidden, the form takes the full width —
-    # st.container() is a drop-in for a column as a context manager.
     if show_diagram:
         inputs_col, diagram_col = st.columns([2, 1])
     else:
         inputs_col, diagram_col = st.container(), None
 
     with inputs_col:
-        # Wrapping the controls in a form means widget changes (especially
-        # dragging the AoA slider) no longer trigger a rerun on every
-        # interaction. The script only reruns when the user clicks submit.
         with st.form("input_form"):
-            # Wrapper to apply tighter margins/labels via our custom CSS
             st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
 
-            # Flow / family row — three even columns that wrap cleanly on narrow
-            # screens. Every widget below is driven by session_state via `key`,
-            # which is what lets the preset buttons populate them. `value=` and
-            # `index=` are deliberately omitted: passing both a key and a
-            # default triggers a Streamlit warning about conflicting sources of
-            # truth.
             flow_cols = st.columns(3)
             with flow_cols[0]:
                 airfoil_family = st.selectbox(
@@ -1288,7 +1032,6 @@ def render_design_inputs(show_diagram: bool, dark_mode: bool) -> tuple[bool, dic
 
             st.caption("Sweep angle, root chord, and tip chord are fixed for this screening model.")
 
-            # Tubercle row — only shown for the biomimetic family.
             if airfoil_family == "biomimetic":
                 tub_cols = st.columns(3)
                 with tub_cols[0]:
@@ -1316,7 +1059,6 @@ def render_design_inputs(show_diagram: bool, dark_mode: bool) -> tuple[bool, dic
             st.markdown('</div>', unsafe_allow_html=True)
             st.caption("Inputs are limited to the model's training range to avoid unsupported extrapolation.")
 
-            # --- Step 3: run -----------------------------------------------
             submitted = st.form_submit_button("Run Prediction", type="primary", use_container_width=True)
 
     if diagram_col is not None:
@@ -1345,7 +1087,6 @@ def render_design_inputs(show_diagram: bool, dark_mode: bool) -> tuple[bool, dic
     }
     return submitted, payload
 
-
 # -----------------------------------------------------------------------------
 # App title and overview
 # -----------------------------------------------------------------------------
@@ -1359,19 +1100,9 @@ st.markdown(
     """
 )
 
-# -----------------------------------------------------------------------------
-# Start Here + progress guide
-#
-# `started` gates the whole workflow — presets, the input form, Run Prediction,
-# and the results. On first load the user sees only the goal and the five steps,
-# so the landing screen is an orientation rather than a wall of controls. The
-# button disappears once pressed: it is a one-time entry point, not a toggle, so
-# leaving it on screen would invite a click that does nothing.
-# -----------------------------------------------------------------------------
 if "started" not in st.session_state:
     st.session_state.started = False
 
-# Breathing room between the intro paragraph and the call to action.
 st.markdown("<div style='height: 1.6rem;'></div>", unsafe_allow_html=True)
 
 if not st.session_state.started:
@@ -1383,17 +1114,10 @@ if not st.session_state.started:
     with goal_col:
         st.markdown(GOAL_SENTENCE)
 else:
-    # The goal stays on screen as a standing reminder of what to optimize for.
     st.markdown(GOAL_SENTENCE)
 
 render_progress_guide()
 
-# -----------------------------------------------------------------------------
-# Workflow (hidden until Start Here)
-#
-# `input_dict` is None while hidden, which is the signal the panels below use to
-# skip anything that depends on live inputs.
-# -----------------------------------------------------------------------------
 if st.session_state.started:
     submitted, input_dict = render_design_inputs(show_diagram=show_diagram, dark_mode=dark_mode)
 else:
@@ -1406,16 +1130,12 @@ if "latest_input_dict" not in st.session_state:
 if "latest_label" not in st.session_state:
     st.session_state.latest_label = None
 if "latest_clip_status" not in st.session_state:
-    # None = interior prediction; otherwise a string from evaluate_clipping().
     st.session_state.latest_clip_status = None
 if "latest_raw_output" not in st.session_state:
     st.session_state.latest_raw_output = None
 if "latest_baseline" not in st.session_state:
-    # dict from run_single_prediction() for a symmetric wing at the same flow
-    # condition, or None when the selected family is not biomimetic.
     st.session_state.latest_baseline = None
 if "prediction_history" not in st.session_state:
-    # Accumulates one record per successful run (inputs + prediction).
     st.session_state.prediction_history = []
 
 # -----------------------------------------------------------------------------
@@ -1459,8 +1179,6 @@ if show_explanations:
 
     with st.expander("Model and input diagnostics"):
         st.write("Current input dictionary:")
-        # None until Start Here is pressed — the input widgets do not exist yet,
-        # so there is nothing to show.
         if input_dict is None:
             st.info("Click **Start Here** above to build an input dictionary.")
         else:
@@ -1471,7 +1189,6 @@ if show_explanations:
         st.write("Validation metric diagnostics:")
         try:
             from src.inference import get_metrics_diagnostics  # noqa: E402
-
             diag = get_metrics_diagnostics()
             st.json(diag)
 
@@ -1519,9 +1236,6 @@ if show_explanations:
 
 # -----------------------------------------------------------------------------
 # Prediction block
-#
-# Gated on `started` alongside the inputs it reports on: there is nothing
-# coherent to show before the user has any controls to run.
 # -----------------------------------------------------------------------------
 if show_prediction and st.session_state.started:
     st.subheader("Model Prediction")
@@ -1530,23 +1244,11 @@ if show_prediction and st.session_state.started:
 
     if submitted:
         try:
-            # Round once, here, so the metric, the plot annotation, the flow
-            # interpretation, and the CSV export can never disagree. Two
-            # decimals is the right precision for a screening estimate; 0.7421
-            # implies a measurement accuracy this model does not have.
-            # Prefer the unclipped output so clipping can be reported honestly.
-            # The fallback path receives an already-clipped value, in which case
-            # only the boundary heuristic in evaluate_clipping() can detect it.
-            # Clamping happens before rounding: a raw 1.4 must not round to 1.40
-            # and be presented as if the model meant it.
             result = run_single_prediction(input_dict)
             model_output = result["raw"]
             clip_status = result["clip_status"]
             prediction = result["prediction"]
 
-            # Compare to baseline: same flow condition, plain symmetric wing.
-            # Wrapped separately so a baseline failure never discards the
-            # user's actual prediction.
             baseline = None
             if input_dict["airfoil_family"] == "biomimetic":
                 try:
@@ -1555,8 +1257,6 @@ if show_prediction and st.session_state.started:
                     baseline = None
             st.session_state.latest_baseline = baseline
 
-            # Label is derived from the rounded value so a prediction of 0.795
-            # cannot display as "0.80" while carrying the sub-0.80 label.
             label = describe_prediction(prediction)
             st.session_state.latest_prediction = prediction
             st.session_state.latest_input_dict = dict(input_dict)
@@ -1564,7 +1264,6 @@ if show_prediction and st.session_state.started:
             st.session_state.latest_clip_status = clip_status
             st.session_state.latest_raw_output = model_output
 
-            # Append this run to the session history (most recent stays latest).
             record = {
                 "run": len(st.session_state.prediction_history) + 1,
                 "timestamp": datetime.now().strftime("%H:%M:%S"),
@@ -1600,9 +1299,6 @@ if show_prediction and st.session_state.started:
         baseline = st.session_state.latest_baseline
         metrics = get_model_metrics_safe()
 
-        # The middle metric column lets the user pick which validation metric to
-        # view. We only offer metrics that were actually found, so the dropdown
-        # never promises a value the model file doesn't provide.
         available_metric_keys = [key for key in METRIC_KEYS if key in metrics]
 
         m_col1, m_col2, m_col3 = st.columns(3)
@@ -1632,27 +1328,18 @@ if show_prediction and st.session_state.started:
                 st.metric("Model R²", "N/A")
                 st.caption("No validation metrics recorded (see below).")
 
-        # Two decimals on x/c means one decimal here would be false precision.
         m_col3.metric(
             "Separation location", f"{prediction * 100:.0f}% chord",
             help=HELP_SEPARATION_PERCENT,
         )
 
-        # Plain-language restatement of the number, directly beneath it.
         st.write(
             f"This means the model predicts separation about {prediction * 100:.0f}% of the way "
             "from the leading edge to the trailing edge."
         )
 
-        # Held-out validation metrics, so the number above is read with the
-        # model's actual accuracy in view rather than as an exact value. The
-        # note always lists all available metrics; the dropdown above only
-        # changes which one is highlighted in the metric row.
         if metrics:
             st.caption(format_reliability_note(metrics))
-
-            # Turn MAE into an explicit band around the prediction. This is a
-            # typical-error range, not a statistical confidence interval.
             if "mae" in metrics:
                 low = max(0.0, prediction - metrics["mae"])
                 high = min(1.0, prediction + metrics["mae"])
@@ -1667,22 +1354,14 @@ if show_prediction and st.session_state.started:
                 "reported with its held-out accuracy."
             )
 
-        # A clipped value is a boundary artifact. Say so before the flow
-        # interpretation, so it is never read as a confident result.
         if clip_status is not None:
             st.warning(f"**Prediction clipped:** {clipping_message(clip_status, raw_output)}")
         elif raw_output is not None and prediction in (0.0, 1.0):
-            # Interior value that merely *rounds* onto a bound (e.g. 0.997 -> 1.00).
-            # Without this note it would be indistinguishable from a clipped result.
             st.caption(
                 f"Displayed as {prediction:.2f} by rounding; the model output was "
                 f"{raw_output:.3f}, inside the valid range. This is not a clipped value."
             )
 
-        # A sentence-style interpretation reads better as a colored callout than
-        # as a metric (which is meant for short numeric values). When the value
-        # was clipped, the confident green/blue styling would be misleading, so
-        # the interpretation is downgraded to a warning callout.
         if clip_status is not None:
             st.warning(f"**Flow interpretation (unreliable):** {label}")
         elif prediction >= 0.80:
@@ -1700,9 +1379,6 @@ if show_prediction and st.session_state.started:
         st.pyplot(fig)
         plt.close(fig)
 
-        # -------------------------------------------------------------------
-        # Compare to Baseline (biomimetic selections only)
-        # -------------------------------------------------------------------
         if baseline is not None:
             st.markdown("#### Compare to Baseline")
             st.caption(
@@ -1745,8 +1421,6 @@ if show_prediction and st.session_state.started:
                 "Confirming a real difference requires CFD or wind-tunnel testing."
             )
 
-    # Full run history (every prediction made this session), shown independently
-    # of the latest-run panel so it persists even after a failed run.
     if st.session_state.prediction_history:
         history_df = pd.DataFrame(st.session_state.prediction_history)
 
@@ -1768,6 +1442,52 @@ if show_prediction and st.session_state.started:
         )
     elif st.session_state.latest_prediction is None:
         st.info("Adjust the inputs in the Input Bar above, then click **Run Prediction**.")
+
+# -----------------------------------------------------------------------------
+# Compare Designs
+# -----------------------------------------------------------------------------
+if show_comparison and st.session_state.started:
+    st.subheader("Compare Designs")
+    if not st.session_state.prediction_history:
+        st.info("Run some predictions first to save them to your session history. You can compare up to 3 runs here.")
+    else:
+        history_df = pd.DataFrame(st.session_state.prediction_history)
+        run_ids = history_df["run"].tolist()
+        
+        # Select the last up to 3 runs by default
+        default_selections = run_ids[-3:] if len(run_ids) >= 3 else run_ids
+
+        selected_runs = st.multiselect(
+            "Select up to 3 saved runs to compare side-by-side:",
+            options=run_ids,
+            default=default_selections,
+            max_selections=3,
+            format_func=lambda x: f"Run {x}: {history_df[history_df['run']==x]['preset'].values[0]}"
+        )
+
+        if selected_runs:
+            compare_cols = st.columns(len(selected_runs))
+            for col, run_id in zip(compare_cols, selected_runs):
+                run_data = history_df[history_df["run"] == run_id].iloc[0]
+                with col:
+                    st.markdown(f"#### Run {run_id}")
+                    st.metric("Separation Point (x/c)", f"{run_data['predicted_separation_x_over_c']:.2f}")
+                    st.write(f"**Wing Type:** {run_data['airfoil_family'].capitalize()}")
+                    st.write(f"**Angle of Attack:** {run_data['angle_of_attack']}°")
+                    st.write(f"**Airspeed:** {run_data['airspeed']} m/s")
+                    
+                    if run_data['airfoil_family'] == 'biomimetic':
+                        st.write(f"**Tubercles:** {run_data['tubercle_shape']}")
+                        st.write(f"**Amplitude:** {run_data['tubercle_amplitude']} mm")
+                        st.write(f"**Wavelength:** {run_data['tubercle_wavelength']} mm")
+                    else:
+                        st.write("**Tubercles:** None")
+                        
+                    delta = run_data['delta_vs_baseline']
+                    if pd.notna(delta):
+                        st.write(f"**Vs. Baseline:** {delta:+.2f} x/c")
+                    else:
+                        st.write("**Vs. Baseline:** N/A")
 
 # -----------------------------------------------------------------------------
 # Sustainability section
@@ -1838,7 +1558,7 @@ st.caption(
 )
 
 # -----------------------------------------------------------------------------
-# About section (toggled from the sidebar)
+# About section
 # -----------------------------------------------------------------------------
 if show_about:
     st.markdown("---")

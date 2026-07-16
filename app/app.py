@@ -133,7 +133,6 @@ st.markdown(
         margin-bottom: 0.75rem;
     }
     
-    /* New styles for validity indicators and reliability card */
     .validity-green { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 0.5rem 0.75rem; border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 1rem;}
     .validity-yellow { color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; padding: 0.5rem 0.75rem; border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 1rem;}
     .validity-red { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 0.5rem 0.75rem; border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 1rem;}
@@ -421,11 +420,9 @@ def clipping_message(status: str, raw_prediction: float) -> str:
 
 
 def eval_input_validity(payload: dict) -> tuple[str, str, str]:
-    """Returns (css_class, icon, message) based on proximity to training bounds."""
     is_edge = False
     is_out_of_bounds = False
 
-    # Check bounds (the UI sliders naturally constrain this, but logic is robust)
     if payload["angle_of_attack"] < 0.0 or payload["angle_of_attack"] > 25.0:
         is_out_of_bounds = True
     elif payload["angle_of_attack"] <= 1.0 or payload["angle_of_attack"] >= 24.0:
@@ -661,27 +658,6 @@ def sustainability_interpretation(separation_x_over_c: float) -> tuple[str, str]
     )
 
 
-def build_sustainability_table(
-    energy_per_flight_wh: float,
-    number_of_flights: int,
-    carbon_factor_kg_per_kwh: float,
-) -> pd.DataFrame:
-    scenarios = [2, 5, 10]
-    rows = []
-    total_energy_kwh = (energy_per_flight_wh * number_of_flights) / 1000.0
-    for efficiency_gain_percent in scenarios:
-        saved_kwh = total_energy_kwh * (efficiency_gain_percent / 100.0)
-        avoided_kg_co2 = saved_kwh * carbon_factor_kg_per_kwh
-        rows.append(
-            {
-                "Assumed efficiency improvement": f"{efficiency_gain_percent}%",
-                "Hypothetical energy saved (kWh)": round(saved_kwh, 3),
-                "Estimated CO₂ avoided under assumed efficiency gain (kg)": round(avoided_kg_co2, 3),
-            }
-        )
-    return pd.DataFrame(rows)
-
-
 # -----------------------------------------------------------------------------
 # Workshop Mode framing
 # -----------------------------------------------------------------------------
@@ -710,11 +686,9 @@ def render_progress_guide() -> None:
 
 
 def render_reliability_card(metrics: dict) -> None:
-    """Renders a compact card showing model validation metrics and details."""
     mae_text = f"{metrics['mae']:.3f} x/c" if "mae" in metrics else "N/A"
     r2_text = f"{metrics['r2']:.3f}" if "r2" in metrics else "N/A"
     
-    # Placeholders for fields not natively returned by get_model_metrics()
     model_type = "Machine Learning Regressor (Prototype)"
     training_size = "~1,200 simulated designs"
     last_update = "July 2026"
@@ -999,7 +973,6 @@ if dark_mode:
         }
         hr { border-color: rgba(255, 255, 255, 0.15) !important; }
         
-        /* Dark mode validity overrides */
         .validity-green { color: #d4edda; background-color: rgba(21, 87, 36, 0.4); border-color: #155724; }
         .validity-yellow { color: #fff3cd; background-color: rgba(133, 100, 4, 0.4); border-color: #856404; }
         .validity-red { color: #f8d7da; background-color: rgba(114, 28, 36, 0.4); border-color: #721c24; }
@@ -1332,6 +1305,7 @@ if show_prediction and st.session_state.started:
         raw_output = st.session_state.latest_raw_output
         baseline = st.session_state.latest_baseline
         metrics = get_model_metrics_safe()
+        current_inputs = st.session_state.latest_input_dict
 
         m_col1, m_col2 = st.columns([1, 1])
         with m_col1:
@@ -1413,6 +1387,18 @@ if show_prediction and st.session_state.started:
                 "predictions, not experimental evidence that tubercles delay separation. "
                 "Confirming a real difference requires CFD or wind-tunnel testing."
             )
+        
+        # ---------------------------------------------------------------------
+        # Copy Results Summary for Worksheet
+        # ---------------------------------------------------------------------
+        st.markdown("##### 📝 Copy Results for Worksheet")
+        summary_text = (
+            f"I tested a {current_inputs['airfoil_family']} wing at {current_inputs['airspeed']} m/s "
+            f"and {current_inputs['angle_of_attack']}° angle of attack. "
+            f"The model predicted separation at x/c = {prediction:.2f}."
+        )
+        # Using st.code provides a native copy-to-clipboard button in the UI
+        st.code(summary_text, language="text")
 
     if st.session_state.prediction_history:
         history_df = pd.DataFrame(st.session_state.prediction_history)
@@ -1482,7 +1468,7 @@ if show_comparison and st.session_state.started:
                         st.write("**Vs. Baseline:** N/A")
 
 # -----------------------------------------------------------------------------
-# Sustainability section
+# Sustainability section (Interactive Scenario Calculator)
 # -----------------------------------------------------------------------------
 if show_sustainability:
     st.subheader("Sustainability Lens")
@@ -1499,47 +1485,62 @@ if show_sustainability:
         sustain_label, sustain_text = sustainability_interpretation(st.session_state.latest_prediction)
         st.markdown(f"**Prediction-based design note:** {sustain_label}")
         st.write(sustain_text)
+        
+        st.markdown("#### Interactive Scenario Calculator")
+        
+        calc_col1, calc_col2 = st.columns(2)
+        with calc_col1:
+            energy_per_flight_wh = st.number_input(
+                "Estimated energy per flight (Wh)",
+                min_value=1.0,
+                max_value=100000.0,
+                value=100.0,
+                step=10.0,
+                help=HELP_ENERGY_PER_FLIGHT,
+            )
+            carbon_factor_kg_per_kwh = st.slider(
+                "Carbon factor (kg CO₂/kWh)",
+                min_value=0.0,
+                max_value=2.0,
+                value=0.40,
+                step=0.01,
+                help=HELP_CARBON_FACTOR,
+            )
+        with calc_col2:
+            number_of_flights = st.number_input(
+                "Number of flights",
+                min_value=1,
+                max_value=100000,
+                value=100,
+                step=10,
+                help=HELP_NUMBER_OF_FLIGHTS,
+            )
+            efficiency_gain_percent = st.slider(
+                "Assumed efficiency gain (%)", 
+                min_value=1.0, 
+                max_value=20.0, 
+                value=5.0, 
+                step=0.5,
+                help="Hypothetical percentage reduction in energy usage due to delayed flow separation."
+            )
+
+        # Dynamic Calculations
+        total_energy_kwh = (energy_per_flight_wh * number_of_flights) / 1000.0
+        saved_kwh = total_energy_kwh * (efficiency_gain_percent / 100.0)
+        avoided_kg_co2 = saved_kwh * carbon_factor_kg_per_kwh
+
+        # Interactive Display
+        current_design = st.session_state.latest_input_dict
+        st.markdown(f"**Selected Design:** {current_design['airfoil_family'].capitalize()} Wing at {current_design['angle_of_attack']}° AoA, {current_design['airspeed']} m/s")
+        
+        res_col1, res_col2 = st.columns(2)
+        res_col1.metric("Hypothetical Energy Savings", f"{saved_kwh:.2f} kWh")
+        res_col2.metric("Hypothetical CO₂ Avoided", f"{avoided_kg_co2:.2f} kg")
+
+        st.warning("⚠️ **Disclaimer:** The efficiency percentage and resulting savings are what-if assumptions for discussion. The ML model predicts flow separation location only, not true drag, battery life, or physical emissions.")
+
     else:
         st.info("Run a prediction first to connect this sustainability estimate to your selected wing design.")
-
-    calc_col1, calc_col2, calc_col3 = st.columns(3)
-    with calc_col1:
-        energy_per_flight_wh = st.number_input(
-            "Estimated energy per flight (Wh)",
-            min_value=1.0,
-            max_value=100000.0,
-            value=100.0,
-            step=10.0,
-            help=HELP_ENERGY_PER_FLIGHT,
-        )
-    with calc_col2:
-        number_of_flights = st.number_input(
-            "Number of flights",
-            min_value=1,
-            max_value=100000,
-            value=100,
-            step=10,
-            help=HELP_NUMBER_OF_FLIGHTS,
-        )
-    with calc_col3:
-        carbon_factor_kg_per_kwh = st.slider(
-            "Carbon factor (kg CO₂/kWh)",
-            min_value=0.0,
-            max_value=2.0,
-            value=0.40,
-            step=0.01,
-            help=HELP_CARBON_FACTOR,
-        )
-
-    sustainability_df = build_sustainability_table(
-        energy_per_flight_wh=energy_per_flight_wh,
-        number_of_flights=int(number_of_flights),
-        carbon_factor_kg_per_kwh=carbon_factor_kg_per_kwh,
-    )
-    st.dataframe(sustainability_df, use_container_width=True)
-    st.caption(
-        "Important: the efficiency percentages above are what-if assumptions for discussion. The current model predicts separation location only, not true drag, battery life, or emissions."
-    )
 
 # -----------------------------------------------------------------------------
 # Footer note

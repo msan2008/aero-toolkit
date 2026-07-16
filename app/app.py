@@ -120,8 +120,9 @@ st.markdown(
     .main .block-container {
         padding-top: 2rem;
         padding-bottom: 3rem;
-        padding-left: clamp(1rem, 5vw, 4rem);
-        padding-right: clamp(1rem, 5vw, 4rem);
+        /* Increased padding for a cleaner UI layout */
+        padding-left: clamp(2rem, 10vw, 8rem);
+        padding-right: clamp(2rem, 10vw, 8rem);
         max-width: 1100px;
         margin: 0 auto;
     }

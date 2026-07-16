@@ -3,8 +3,10 @@ from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import streamlit as st
+from matplotlib.patches import Arc
 
 # -----------------------------------------------------------------------------
 # Robust path setup so Streamlit can import from src/ whether this file is run
@@ -328,6 +330,85 @@ st.markdown(
 )
 
 # -----------------------------------------------------------------------------
+# Hover help text
+#
+# Every technical control gets a definition, not a restatement of its label. A
+# participant who does not already know what "angle of attack" means should be
+# able to learn it from the tooltip without leaving the app. These live as
+# module constants because several are reused (separation_x_over_c is described
+# in two places, and the geometry terms echo the wing diagram's labels).
+# -----------------------------------------------------------------------------
+HELP_AIRFOIL_FAMILY = (
+    "The cross-section shape of the wing. **Symmetric**: identical curvature above "
+    "and below, so it makes no lift at 0° angle of attack. **Cambered**: more "
+    "curvature on top, so it makes lift even at 0°. **Biomimetic**: cambered with "
+    "humpback-whale-style bumps along the leading edge. Choosing biomimetic reveals "
+    "the tubercle controls."
+)
+HELP_ANGLE_OF_ATTACK = (
+    "Angle of attack — the angle between the wing's chord line (the straight line "
+    "from leading edge to trailing edge) and the oncoming air. Raising it increases "
+    "lift, up to the point where the flow can no longer follow the upper surface and "
+    "separates: that is a stall. Limited to the model's training range (0–25°)."
+)
+HELP_AIRSPEED = (
+    "Freestream airspeed — how fast the air moves past the wing, in metres per "
+    "second. Faster air carries more momentum near the surface, which generally "
+    "helps the flow stay attached further back along the chord. Only the two speeds "
+    "the model was trained on are offered (15 and 30 m/s)."
+)
+HELP_TUBERCLE_SHAPE = (
+    "Tubercles are the rounded bumps along a humpback whale's flipper, and along "
+    "this wing's leading edge. This selects which bump profile is used: **whale** "
+    "follows the flipper geometry; **biomimetic_v1** is this project's variant."
+)
+HELP_TUBERCLE_AMPLITUDE = (
+    "Tubercle amplitude — how far each bump projects forward from the average "
+    "leading-edge line, in millimetres. Taller bumps drive stronger streamwise "
+    "vortices, which is the mechanism thought to delay separation. Limited to the "
+    "model's training range (26.2–32.7 mm)."
+)
+HELP_TUBERCLE_WAVELENGTH = (
+    "Tubercle wavelength — the distance from one bump crest to the next, in "
+    "millimetres. Amplitude and wavelength together set how pronounced and how "
+    "tightly spaced the bumps are. Limited to the training range (42.3–49.6 mm)."
+)
+HELP_SEPARATION = (
+    "separation_x_over_c — where the airflow detaches from the wing surface, given "
+    "as a fraction of the chord (the leading-edge-to-trailing-edge distance). 0.00 "
+    "means separation right at the leading edge; 1.00 means the flow stays attached "
+    "all the way to the trailing edge. Higher is better: more of the wing is doing "
+    "useful work instead of sitting in turbulent, separated air."
+)
+HELP_SEPARATION_PERCENT = (
+    "The same prediction expressed as a percentage of chord length, measured back "
+    "from the leading edge. 70% chord means the flow is predicted to stay attached "
+    "over roughly the first 70% of the wing."
+)
+HELP_VALIDATION_METRIC = (
+    "Which held-out test-set score to display. These describe how well the model did "
+    "on designs it never saw during training — not how good the current wing is."
+)
+HELP_ENERGY_PER_FLIGHT = (
+    "Your assumption for how much battery energy one flight consumes, in watt-hours "
+    "(Wh). A small quadcopter is very roughly 50–150 Wh per flight. The model does "
+    "not predict this — you supply it."
+)
+HELP_NUMBER_OF_FLIGHTS = (
+    "How many flights to total up. This only scales the what-if saving; it has no "
+    "effect on the aerodynamic prediction."
+)
+HELP_CARBON_FACTOR = (
+    "Kilograms of CO₂ released per kilowatt-hour of grid electricity used to charge "
+    "the battery. It varies widely by region and time of day; 0.4 is a common rough "
+    "average. A discussion assumption, not a certified emissions figure."
+)
+HELP_DIAGRAM_TOGGLE = (
+    "A labelled wing planform showing the geometry terms these inputs use: leading "
+    "and trailing edge, root and tip chord, sweep angle, and tubercles."
+)
+
+# -----------------------------------------------------------------------------
 # Helper functions
 # -----------------------------------------------------------------------------
 def get_model_metrics_safe() -> dict[str, float]:
@@ -464,6 +545,117 @@ def clipping_message(status: str, raw_prediction: float) -> str:
         "the value reaches the interface, so the underlying model output is unknown and may lie "
         "well past the edge. This is a boundary artifact, not a confident prediction."
     )
+
+
+def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
+    """Labelled reference planform (top view) for the vocabulary the inputs use.
+
+    This is a *terminology* diagram, not a rendering of the current design.
+    Sweep and taper are drawn deliberately so that "sweep angle" and "tip chord"
+    have something to point at — this screening model holds sweep at 0° and root
+    chord = tip chord. The caption beneath says so, so the picture is never read
+    as the wing the user just configured.
+    """
+    if dark_mode:
+        bg_color = "#0e1117"
+        fg_color = "#e6e6e6"
+        fill_color = "#22303d"
+        edge_color = "#5aa9e6"
+        accent_color = "#ff9b94"
+    else:
+        bg_color = "white"
+        fg_color = "black"
+        fill_color = "#eef3fb"
+        edge_color = "#3f6184"
+        accent_color = "#2178a8"
+
+    # x is spanwise (0 = root, 1 = tip); y is chordwise, 0 at the root leading
+    # edge with negative values running aft toward the trailing edge.
+    span = 1.0
+    root_le, root_te = 0.0, -1.0
+    tip_le, tip_te = -0.35, -0.95
+
+    fig, ax = plt.subplots(figsize=(5.5, 4.4))
+    fig.patch.set_facecolor(bg_color)
+    ax.set_facecolor(bg_color)
+    ax.set_aspect("equal")  # a geometry diagram with a distorted angle is a lie
+
+    # Wing outline, drawn with a straight leading edge; the tubercle wave is
+    # overlaid on top of it below.
+    ax.fill(
+        [0, span, span, 0],
+        [root_le, tip_le, tip_te, root_te],
+        facecolor=fill_color,
+        edgecolor=edge_color,
+        linewidth=1.5,
+        zorder=1,
+    )
+
+    # ---- Tubercles: a sine wave running along the leading edge --------------
+    le_vec = np.array([span, tip_le - root_le])
+    le_len = float(np.linalg.norm(le_vec))
+    le_dir = le_vec / le_len
+    le_normal = np.array([-le_dir[1], le_dir[0]])  # perpendicular, pointing forward
+
+    t = np.linspace(0.0, 1.0, 400)
+    wave = 0.035 * np.sin(2 * np.pi * 7 * t)
+    le_points = (
+        np.array([0.0, root_le])[None, :]
+        + (t[:, None] * le_len) * le_dir[None, :]
+        + wave[:, None] * le_normal[None, :]
+    )
+    ax.plot(le_points[:, 0], le_points[:, 1], color=accent_color, linewidth=2.2, zorder=3)
+
+    # ---- Chord dimensions ---------------------------------------------------
+    ax.annotate(
+        "", xy=(-0.10, root_le), xytext=(-0.10, root_te),
+        arrowprops=dict(arrowstyle="<->", color=fg_color, lw=1.2),
+    )
+    ax.text(
+        -0.19, (root_le + root_te) / 2, "Root chord",
+        rotation=90, ha="center", va="center", color=fg_color, fontsize=9,
+    )
+
+    ax.annotate(
+        "", xy=(1.12, tip_le), xytext=(1.12, tip_te),
+        arrowprops=dict(arrowstyle="<->", color=fg_color, lw=1.2),
+    )
+    ax.text(
+        1.21, (tip_le + tip_te) / 2, "Tip chord",
+        rotation=90, ha="center", va="center", color=fg_color, fontsize=9,
+    )
+
+    # ---- Sweep angle: reference line, arc, label ----------------------------
+    ax.plot([0, 0.62], [0, 0], linestyle="--", linewidth=1.0, color=fg_color, alpha=0.6, zorder=2)
+    le_angle_deg = float(np.degrees(np.arctan2(tip_le - root_le, span)))
+    ax.add_patch(
+        Arc((0, 0), width=0.9, height=0.9, angle=0.0,
+            theta1=le_angle_deg, theta2=0.0, color=fg_color, lw=1.2, zorder=4)
+    )
+    ax.text(0.68, -0.11, "Sweep angle", ha="left", va="center", color=fg_color, fontsize=9)
+
+    # ---- Edge + tubercle callouts ------------------------------------------
+    ax.annotate(
+        "Leading edge", xy=(0.18, -0.063), xytext=(-0.50, 0.36),
+        arrowprops=dict(arrowstyle="->", color=fg_color, lw=1.0),
+        color=fg_color, fontsize=9, ha="left", va="center",
+    )
+    ax.annotate(
+        "Trailing edge", xy=(0.50, -0.975), xytext=(0.50, -1.30),
+        arrowprops=dict(arrowstyle="->", color=fg_color, lw=1.0),
+        color=fg_color, fontsize=9, ha="center", va="center",
+    )
+    ax.annotate(
+        "Tubercles", xy=(0.75, -0.263), xytext=(1.30, 0.20),
+        arrowprops=dict(arrowstyle="->", color=accent_color, lw=1.0),
+        color=accent_color, fontsize=9, ha="left", va="center",
+    )
+
+    ax.set_xlim(-0.80, 1.90)
+    ax.set_ylim(-1.45, 0.60)
+    ax.axis("off")
+    ax.set_title("Wing planform (top view)", color=fg_color, fontsize=11)
+    return fig
 
 
 def plot_airfoil_and_separation(
@@ -700,252 +892,15 @@ if not st.session_state.entered:
     st.stop()
 
 # -----------------------------------------------------------------------------
-# Presets
-#
-# Each preset writes directly into the widget keys used by the input bar below.
-# Tubercle values are always stored inside the sliders' valid ranges (even for
-# the non-biomimetic presets) so the sliders never re-render with an
-# out-of-bounds value; the "none"/0.0 substitution happens later, when the
-# input dictionary is assembled.
-# -----------------------------------------------------------------------------
-PRESETS: dict[str, dict] = {
-    "Symmetric baseline": {
-        "airfoil_family": "symmetric",
-        "angle_of_attack": 5.0,
-        "airspeed": 15,
-        "tubercle_shape": "whale",
-        "tubercle_amplitude": 26.2,
-        "tubercle_wavelength": 49.6,
-    },
-    "Cambered baseline": {
-        "airfoil_family": "cambered",
-        "angle_of_attack": 5.0,
-        "airspeed": 15,
-        "tubercle_shape": "whale",
-        "tubercle_amplitude": 26.2,
-        "tubercle_wavelength": 49.6,
-    },
-    "Biomimetic default": {
-        "airfoil_family": "biomimetic",
-        "angle_of_attack": 10.0,
-        "airspeed": 30,
-        "tubercle_shape": "whale",
-        "tubercle_amplitude": 26.2,
-        "tubercle_wavelength": 49.6,
-    },
-    # A deliberately hard case: a plain symmetric section at a high angle of
-    # attack and low airspeed. Separation should be predicted early, giving
-    # workshop participants a design to improve — the intended move is to
-    # switch the family to biomimetic and tune the tubercle geometry.
-    "Workshop challenge": {
-        "airfoil_family": "symmetric",
-        "angle_of_attack": 20.0,
-        "airspeed": 15,
-        "tubercle_shape": "whale",
-        "tubercle_amplitude": 32.7,
-        "tubercle_wavelength": 42.3,
-    },
-}
-
-# Biomimetic is the default because the project is centered on biomimicry, and
-# workshop users should see the tubercle controls on first load. Change this
-# one string to "Symmetric baseline" to start from the flat-plate comparison.
-DEFAULT_PRESET = "Biomimetic default"
-
-if "active_preset" not in st.session_state:
-    st.session_state.active_preset = DEFAULT_PRESET
-
-# setdefault (not direct assignment) so a user's manual edits survive reruns.
-# It also self-heals: Streamlit drops session_state entries for widgets that
-# were not rendered on the previous run, which is what happens to the tubercle
-# sliders whenever a non-biomimetic family is selected — and to every input
-# widget while the workflow is still hidden behind Start Here.
-for _key, _value in PRESETS[DEFAULT_PRESET].items():
-    st.session_state.setdefault(_key, _value)
-
-
-def apply_preset(name: str) -> None:
-    """Write a preset into the widget keys.
-
-    This runs before the input widgets are instantiated on the current script
-    run, so no explicit st.rerun() is needed: the button click already
-    triggered the rerun, and the widgets pick these values up as they render.
-    """
-    for key, value in PRESETS[name].items():
-        st.session_state[key] = value
-    st.session_state.active_preset = name
-
-
-def render_design_inputs() -> tuple[bool, dict]:
-    """Render Step 1 (presets) and Step 2 (the input form).
-
-    Returns (submitted, input_dict). Pulled into a function so the whole
-    workflow can be gated behind Start Here with a single branch rather than
-    indenting the entire input bar.
-    """
-    st.markdown("---")
-
-    # --- Step 1: presets ---------------------------------------------------
-    # Preset buttons must live outside the form: Streamlit only permits
-    # st.form_submit_button inside a form block.
-    st.markdown('<p class="step-eyebrow">Step 1 · Start from a preset</p>', unsafe_allow_html=True)
-    st.caption("Each preset fills the inputs below with a known starting point. You can still adjust anything before running.")
-
-    preset_cols = st.columns(len(PRESETS))
-    for _col, _preset_name in zip(preset_cols, PRESETS):
-        with _col:
-            if st.button(_preset_name, use_container_width=True, key=f"preset_{_preset_name}"):
-                apply_preset(_preset_name)
-
-    st.caption(f"Last preset applied: **{st.session_state.active_preset}**.")
-
-    # --- Step 2: inputs ----------------------------------------------------
-    st.markdown('<p class="step-eyebrow">Step 2 · Adjust the wing and flow inputs</p>', unsafe_allow_html=True)
-
-    # Wrapping the controls in a form means widget changes (especially dragging
-    # the AoA slider) no longer trigger a rerun on every interaction. The script
-    # only reruns when the user clicks the submit button below.
-    with st.form("input_form"):
-        # Wrapper to apply tighter margins/labels via our custom CSS
-        st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
-
-        # Flow / family row — three even columns that wrap cleanly on narrow
-        # screens. Every widget below is driven by session_state via `key`,
-        # which is what lets the preset buttons populate them. `value=`/`index=`
-        # are deliberately omitted: passing both a key and a default triggers a
-        # Streamlit warning about conflicting sources of truth.
-        flow_cols = st.columns(3)
-        with flow_cols[0]:
-            airfoil_family = st.selectbox(
-                "Airfoil Family",
-                ["symmetric", "cambered", "biomimetic"],
-                key="airfoil_family",
-                help="Wing section type. Choose 'biomimetic' to reveal the tubercle geometry controls.",
-            )
-        with flow_cols[1]:
-            angle_of_attack = st.slider(
-                "AoA (°)", min_value=0.0, max_value=25.0, step=0.5, format="%.1f",
-                key="angle_of_attack",
-                help="Angle of attack, in degrees. Limited to the model's training range (0–25°).",
-            )
-        with flow_cols[2]:
-            airspeed = st.selectbox(
-                "Airspeed (m/s)",
-                [15, 30],
-                format_func=lambda v: f"{v} m/s",
-                key="airspeed",
-                help="Freestream airspeed. Only the two speeds the model was trained on are offered.",
-            )
-
-        st.caption("Sweep angle, root chord, and tip chord are fixed for this screening model.")
-
-        # Tubercle row — only shown for the biomimetic family.
-        if airfoil_family == "biomimetic":
-            tub_cols = st.columns(3)
-            with tub_cols[0]:
-                tubercle_shape = st.selectbox(
-                    "Tubercle Shape", ["whale", "biomimetic_v1"], key="tubercle_shape",
-                    help="Leading-edge tubercle profile.",
-                )
-            with tub_cols[1]:
-                tubercle_amplitude = st.slider(
-                    "Amplitude (mm)", min_value=26.2, max_value=32.7, step=0.1,
-                    format="%.1f mm", key="tubercle_amplitude",
-                    help="Tubercle height, in mm. Limited to the model's training range (26.2–32.7 mm).",
-                )
-            with tub_cols[2]:
-                tubercle_wavelength = st.slider(
-                    "Wavelength (mm)", min_value=42.3, max_value=49.6, step=0.1,
-                    format="%.1f mm", key="tubercle_wavelength",
-                    help="Spacing between tubercles, in mm. Limited to the training range (42.3–49.6 mm).",
-                )
-        else:
-            tubercle_shape = "none"
-            tubercle_amplitude = 0.0
-            tubercle_wavelength = 0.0
-
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.caption("Inputs are limited to the model's training range to avoid unsupported extrapolation.")
-
-        # --- Step 3: run ---------------------------------------------------
-        submitted = st.form_submit_button("Run Prediction", type="primary", use_container_width=True)
-
-    st.markdown("---")
-
-    payload = {
-        "airfoil_family": airfoil_family,
-        "tubercle_amplitude": tubercle_amplitude,
-        "tubercle_wavelength": tubercle_wavelength,
-        "tubercle_shape": tubercle_shape,
-        "root_chord": ROOT_CHORD,
-        "tip_chord": TIP_CHORD,
-        "sweep_angle": SWEEP_ANGLE,
-        "angle_of_attack": angle_of_attack,
-        "airspeed": airspeed,
-    }
-    return submitted, payload
-
-
-# -----------------------------------------------------------------------------
-# App title and overview
-# -----------------------------------------------------------------------------
-st.title("WingCheck: Biomimetic Wing Screening Tool")
-st.markdown(
-    """
-    This prototype uses a saved machine learning model to predict the flow separation
-    location, `separation_x_over_c`, from wing geometry and flow inputs. The goal is
-    to help students, makers, and robotics teams quickly screen wing ideas before
-    committing to more expensive CFD or wind-tunnel testing.
-    """
-)
-
-# -----------------------------------------------------------------------------
-# Start Here + progress guide
-#
-# `started` gates the whole workflow — presets, the input form, Run Prediction,
-# and the results. On first load the user sees only the goal and the five steps,
-# so the landing screen is an orientation rather than a wall of controls. The
-# button disappears once pressed: it is a one-time entry point, not a toggle, so
-# leaving it on screen would invite a click that does nothing.
-# -----------------------------------------------------------------------------
-if "started" not in st.session_state:
-    st.session_state.started = False
-
-# Breathing room between the intro paragraph and the call to action.
-st.markdown("<div style='height: 1.6rem;'></div>", unsafe_allow_html=True)
-
-if not st.session_state.started:
-    start_col, goal_col = st.columns([1, 4])
-    with start_col:
-        if st.button("Start Here", type="primary", use_container_width=True):
-            st.session_state.started = True
-            st.rerun()
-    with goal_col:
-        st.markdown(GOAL_SENTENCE)
-else:
-    # The goal stays on screen as a standing reminder of what to optimize for.
-    st.markdown(GOAL_SENTENCE)
-
-render_progress_guide()
-
-# -----------------------------------------------------------------------------
-# Workflow (hidden until Start Here)
-#
-# `input_dict` is None while hidden, which is the signal the panels below use to
-# skip anything that depends on live inputs.
-# -----------------------------------------------------------------------------
-if st.session_state.started:
-    submitted, input_dict = render_design_inputs()
-else:
-    submitted, input_dict = False, None
-
-# -----------------------------------------------------------------------------
 # Sidebar Display Options
 # -----------------------------------------------------------------------------
-# Workshop Mode identity + grouped controls. Variable names and defaults are
-# unchanged, so every downstream `if show_*:` block behaves exactly as before —
-# only the labeling and grouping changed. This is now the only place the mode
-# is named, which is also where the "why is geometry fixed?" question surfaces.
+# Rendered before the main column even though it appears to the left of it:
+# Streamlit executes top to bottom, and the input bar now needs `show_diagram`
+# and `dark_mode`. It still sits below the welcome page's st.stop(), so the
+# launch screen stays chrome-free.
+#
+# Workshop Mode identity + grouped controls. This is the only place the mode is
+# named, which is also where the "why is the geometry fixed?" question surfaces.
 st.sidebar.markdown('<span class="mode-badge">Workshop Mode</span>', unsafe_allow_html=True)
 st.sidebar.caption("A guided, simplified view for classroom and workshop use.")
 st.sidebar.caption(ADVANCED_MODE_NOTE)
@@ -954,6 +909,10 @@ st.sidebar.markdown("### Panels")
 show_prediction = st.sidebar.toggle(
     "Prediction", value=True,
     help="The core screening result. Recommended: keep this on.",
+)
+show_diagram = st.sidebar.toggle(
+    "Diagram", value=True,
+    help=HELP_DIAGRAM_TOGGLE,
 )
 show_explanations = st.sidebar.toggle(
     "Explanations", value=False,
@@ -1179,6 +1138,267 @@ if dark_mode:
         unsafe_allow_html=True,
     )
 
+# -----------------------------------------------------------------------------
+# Presets
+#
+# Each preset writes directly into the widget keys used by the input bar below.
+# Tubercle values are always stored inside the sliders' valid ranges (even for
+# the non-biomimetic presets) so the sliders never re-render with an
+# out-of-bounds value; the "none"/0.0 substitution happens later, when the
+# input dictionary is assembled.
+# -----------------------------------------------------------------------------
+PRESETS: dict[str, dict] = {
+    "Symmetric baseline": {
+        "airfoil_family": "symmetric",
+        "angle_of_attack": 5.0,
+        "airspeed": 15,
+        "tubercle_shape": "whale",
+        "tubercle_amplitude": 26.2,
+        "tubercle_wavelength": 49.6,
+    },
+    "Cambered baseline": {
+        "airfoil_family": "cambered",
+        "angle_of_attack": 5.0,
+        "airspeed": 15,
+        "tubercle_shape": "whale",
+        "tubercle_amplitude": 26.2,
+        "tubercle_wavelength": 49.6,
+    },
+    "Biomimetic default": {
+        "airfoil_family": "biomimetic",
+        "angle_of_attack": 10.0,
+        "airspeed": 30,
+        "tubercle_shape": "whale",
+        "tubercle_amplitude": 26.2,
+        "tubercle_wavelength": 49.6,
+    },
+    # A deliberately hard case: a plain symmetric section at a high angle of
+    # attack and low airspeed. Separation should be predicted early, giving
+    # workshop participants a design to improve — the intended move is to
+    # switch the family to biomimetic and tune the tubercle geometry.
+    "Workshop challenge": {
+        "airfoil_family": "symmetric",
+        "angle_of_attack": 20.0,
+        "airspeed": 15,
+        "tubercle_shape": "whale",
+        "tubercle_amplitude": 32.7,
+        "tubercle_wavelength": 42.3,
+    },
+}
+
+# Biomimetic is the default because the project is centered on biomimicry, and
+# workshop users should see the tubercle controls on first load. Change this
+# one string to "Symmetric baseline" to start from the flat-plate comparison.
+DEFAULT_PRESET = "Biomimetic default"
+
+if "active_preset" not in st.session_state:
+    st.session_state.active_preset = DEFAULT_PRESET
+
+# setdefault (not direct assignment) so a user's manual edits survive reruns.
+# It also self-heals: Streamlit drops session_state entries for widgets that
+# were not rendered on the previous run, which is what happens to the tubercle
+# sliders whenever a non-biomimetic family is selected — and to every input
+# widget while the workflow is still hidden behind Start Here.
+for _key, _value in PRESETS[DEFAULT_PRESET].items():
+    st.session_state.setdefault(_key, _value)
+
+
+def apply_preset(name: str) -> None:
+    """Write a preset into the widget keys.
+
+    This runs before the input widgets are instantiated on the current script
+    run, so no explicit st.rerun() is needed: the button click already
+    triggered the rerun, and the widgets pick these values up as they render.
+    """
+    for key, value in PRESETS[name].items():
+        st.session_state[key] = value
+    st.session_state.active_preset = name
+
+
+def render_design_inputs(show_diagram: bool, dark_mode: bool) -> tuple[bool, dict]:
+    """Render Step 1 (presets) and Step 2 (the input form + wing diagram).
+
+    Returns (submitted, input_dict). Pulled into a function so the whole
+    workflow can be gated behind Start Here with a single branch rather than
+    indenting the entire input bar.
+    """
+    st.markdown("---")
+
+    # --- Step 1: presets ---------------------------------------------------
+    # Preset buttons must live outside the form: Streamlit only permits
+    # st.form_submit_button inside a form block.
+    st.markdown('<p class="step-eyebrow">Step 1 · Start from a preset</p>', unsafe_allow_html=True)
+    st.caption("Each preset fills the inputs below with a known starting point. You can still adjust anything before running.")
+
+    preset_cols = st.columns(len(PRESETS))
+    for _col, _preset_name in zip(preset_cols, PRESETS):
+        with _col:
+            if st.button(_preset_name, use_container_width=True, key=f"preset_{_preset_name}"):
+                apply_preset(_preset_name)
+
+    st.caption(f"Last preset applied: **{st.session_state.active_preset}**.")
+
+    # --- Step 2: inputs ----------------------------------------------------
+    st.markdown('<p class="step-eyebrow">Step 2 · Adjust the wing and flow inputs</p>', unsafe_allow_html=True)
+
+    # The diagram sits beside the controls so the vocabulary is visible while
+    # the terms are being used. When hidden, the form takes the full width —
+    # st.container() is a drop-in for a column as a context manager.
+    if show_diagram:
+        inputs_col, diagram_col = st.columns([2, 1])
+    else:
+        inputs_col, diagram_col = st.container(), None
+
+    with inputs_col:
+        # Wrapping the controls in a form means widget changes (especially
+        # dragging the AoA slider) no longer trigger a rerun on every
+        # interaction. The script only reruns when the user clicks submit.
+        with st.form("input_form"):
+            # Wrapper to apply tighter margins/labels via our custom CSS
+            st.markdown('<div class="condensed-label">', unsafe_allow_html=True)
+
+            # Flow / family row — three even columns that wrap cleanly on narrow
+            # screens. Every widget below is driven by session_state via `key`,
+            # which is what lets the preset buttons populate them. `value=` and
+            # `index=` are deliberately omitted: passing both a key and a
+            # default triggers a Streamlit warning about conflicting sources of
+            # truth.
+            flow_cols = st.columns(3)
+            with flow_cols[0]:
+                airfoil_family = st.selectbox(
+                    "Airfoil Family",
+                    ["symmetric", "cambered", "biomimetic"],
+                    key="airfoil_family",
+                    help=HELP_AIRFOIL_FAMILY,
+                )
+            with flow_cols[1]:
+                angle_of_attack = st.slider(
+                    "AoA (°)", min_value=0.0, max_value=25.0, step=0.5, format="%.1f",
+                    key="angle_of_attack",
+                    help=HELP_ANGLE_OF_ATTACK,
+                )
+            with flow_cols[2]:
+                airspeed = st.selectbox(
+                    "Airspeed (m/s)",
+                    [15, 30],
+                    format_func=lambda v: f"{v} m/s",
+                    key="airspeed",
+                    help=HELP_AIRSPEED,
+                )
+
+            st.caption("Sweep angle, root chord, and tip chord are fixed for this screening model.")
+
+            # Tubercle row — only shown for the biomimetic family.
+            if airfoil_family == "biomimetic":
+                tub_cols = st.columns(3)
+                with tub_cols[0]:
+                    tubercle_shape = st.selectbox(
+                        "Tubercle Shape", ["whale", "biomimetic_v1"], key="tubercle_shape",
+                        help=HELP_TUBERCLE_SHAPE,
+                    )
+                with tub_cols[1]:
+                    tubercle_amplitude = st.slider(
+                        "Amplitude (mm)", min_value=26.2, max_value=32.7, step=0.1,
+                        format="%.1f mm", key="tubercle_amplitude",
+                        help=HELP_TUBERCLE_AMPLITUDE,
+                    )
+                with tub_cols[2]:
+                    tubercle_wavelength = st.slider(
+                        "Wavelength (mm)", min_value=42.3, max_value=49.6, step=0.1,
+                        format="%.1f mm", key="tubercle_wavelength",
+                        help=HELP_TUBERCLE_WAVELENGTH,
+                    )
+            else:
+                tubercle_shape = "none"
+                tubercle_amplitude = 0.0
+                tubercle_wavelength = 0.0
+
+            st.markdown('</div>', unsafe_allow_html=True)
+            st.caption("Inputs are limited to the model's training range to avoid unsupported extrapolation.")
+
+            # --- Step 3: run -----------------------------------------------
+            submitted = st.form_submit_button("Run Prediction", type="primary", use_container_width=True)
+
+    if diagram_col is not None:
+        with diagram_col:
+            wing_fig = plot_wing_geometry(dark_mode=dark_mode)
+            st.pyplot(wing_fig)
+            plt.close(wing_fig)
+            st.caption(
+                "Reference diagram for the terms used here. Sweep and taper are drawn so those "
+                "labels have something to point at — this screening model holds sweep angle at 0° "
+                "and root chord = tip chord. Hide it from the sidebar under **Panels → Diagram**."
+            )
+
+    st.markdown("---")
+
+    payload = {
+        "airfoil_family": airfoil_family,
+        "tubercle_amplitude": tubercle_amplitude,
+        "tubercle_wavelength": tubercle_wavelength,
+        "tubercle_shape": tubercle_shape,
+        "root_chord": ROOT_CHORD,
+        "tip_chord": TIP_CHORD,
+        "sweep_angle": SWEEP_ANGLE,
+        "angle_of_attack": angle_of_attack,
+        "airspeed": airspeed,
+    }
+    return submitted, payload
+
+
+# -----------------------------------------------------------------------------
+# App title and overview
+# -----------------------------------------------------------------------------
+st.title("WingCheck: Biomimetic Wing Screening Tool")
+st.markdown(
+    """
+    This prototype uses a saved machine learning model to predict the flow separation
+    location, `separation_x_over_c`, from wing geometry and flow inputs. The goal is
+    to help students, makers, and robotics teams quickly screen wing ideas before
+    committing to more expensive CFD or wind-tunnel testing.
+    """
+)
+
+# -----------------------------------------------------------------------------
+# Start Here + progress guide
+#
+# `started` gates the whole workflow — presets, the input form, Run Prediction,
+# and the results. On first load the user sees only the goal and the five steps,
+# so the landing screen is an orientation rather than a wall of controls. The
+# button disappears once pressed: it is a one-time entry point, not a toggle, so
+# leaving it on screen would invite a click that does nothing.
+# -----------------------------------------------------------------------------
+if "started" not in st.session_state:
+    st.session_state.started = False
+
+# Breathing room between the intro paragraph and the call to action.
+st.markdown("<div style='height: 1.6rem;'></div>", unsafe_allow_html=True)
+
+if not st.session_state.started:
+    start_col, goal_col = st.columns([1, 4])
+    with start_col:
+        if st.button("Start Here", type="primary", use_container_width=True):
+            st.session_state.started = True
+            st.rerun()
+    with goal_col:
+        st.markdown(GOAL_SENTENCE)
+else:
+    # The goal stays on screen as a standing reminder of what to optimize for.
+    st.markdown(GOAL_SENTENCE)
+
+render_progress_guide()
+
+# -----------------------------------------------------------------------------
+# Workflow (hidden until Start Here)
+#
+# `input_dict` is None while hidden, which is the signal the panels below use to
+# skip anything that depends on live inputs.
+# -----------------------------------------------------------------------------
+if st.session_state.started:
+    submitted, input_dict = render_design_inputs(show_diagram=show_diagram, dark_mode=dark_mode)
+else:
+    submitted, input_dict = False, None
+
 if "latest_prediction" not in st.session_state:
     st.session_state.latest_prediction = None
 if "latest_input_dict" not in st.session_state:
@@ -1386,7 +1606,10 @@ if show_prediction and st.session_state.started:
         available_metric_keys = [key for key in METRIC_KEYS if key in metrics]
 
         m_col1, m_col2, m_col3 = st.columns(3)
-        m_col1.metric("Predicted separation_x_over_c", f"{prediction:.2f}")
+        m_col1.metric(
+            "Predicted separation_x_over_c", f"{prediction:.2f}",
+            help=HELP_SEPARATION,
+        )
         m_col1.caption("This is a screening estimate, not a measured value")
 
         with m_col2:
@@ -1397,10 +1620,12 @@ if show_prediction and st.session_state.started:
                     format_func=lambda key: METRIC_LABELS[key],
                     key="selected_metric",
                     label_visibility="collapsed",
+                    help=HELP_VALIDATION_METRIC,
                 )
                 st.metric(
                     METRIC_LABELS[selected_metric],
                     format_metric_value(selected_metric, metrics[selected_metric]),
+                    help=METRIC_HELP[selected_metric],
                 )
                 st.caption(METRIC_HELP[selected_metric])
             else:
@@ -1408,7 +1633,10 @@ if show_prediction and st.session_state.started:
                 st.caption("No validation metrics recorded (see below).")
 
         # Two decimals on x/c means one decimal here would be false precision.
-        m_col3.metric("Separation location", f"{prediction * 100:.0f}% chord")
+        m_col3.metric(
+            "Separation location", f"{prediction * 100:.0f}% chord",
+            help=HELP_SEPARATION_PERCENT,
+        )
 
         # Plain-language restatement of the number, directly beneath it.
         st.write(
@@ -1484,12 +1712,21 @@ if show_prediction and st.session_state.started:
 
             delta = round(prediction - baseline["prediction"], 2)
             b_col1, b_col2, b_col3 = st.columns(3)
-            b_col1.metric("Biomimetic (selected)", f"{prediction:.2f}")
-            b_col2.metric("Symmetric baseline", f"{baseline['prediction']:.2f}")
+            b_col1.metric(
+                "Biomimetic (selected)", f"{prediction:.2f}",
+                help=HELP_SEPARATION,
+            )
+            b_col2.metric(
+                "Symmetric baseline", f"{baseline['prediction']:.2f}",
+                help="The same prediction for a plain symmetric wing with no tubercles, at this "
+                     "exact angle of attack and airspeed.",
+            )
             b_col3.metric(
                 "Difference in x/c",
                 f"{delta:+.2f}",
                 delta=f"{delta * 100:+.0f}% chord",
+                help="Biomimetic minus symmetric. Positive means the model predicts separation "
+                     "further back on the biomimetic wing, which is the desired direction.",
             )
 
             st.write(describe_baseline_delta(delta))
@@ -1561,6 +1798,7 @@ if show_sustainability:
             max_value=100000.0,
             value=100.0,
             step=10.0,
+            help=HELP_ENERGY_PER_FLIGHT,
         )
     with calc_col2:
         number_of_flights = st.number_input(
@@ -1569,6 +1807,7 @@ if show_sustainability:
             max_value=100000,
             value=100,
             step=10,
+            help=HELP_NUMBER_OF_FLIGHTS,
         )
     with calc_col3:
         carbon_factor_kg_per_kwh = st.slider(
@@ -1577,6 +1816,7 @@ if show_sustainability:
             max_value=2.0,
             value=0.40,
             step=0.01,
+            help=HELP_CARBON_FACTOR,
         )
 
     sustainability_df = build_sustainability_table(

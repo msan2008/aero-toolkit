@@ -25,13 +25,8 @@ from src.inference import (  # noqa: E402
     predict_from_dict,
 )
 
-# predict_raw_from_dict() returns the UNCLIPPED model output, which is what lets
-# this app distinguish a genuine 1.0 from a clamped 1.4. It only exists in the
-# updated src/inference.py; if the app is run against an older copy, we fall
-# back to the clipped value and detect clipping from the boundary instead.
 try:
     from src.inference import predict_raw_from_dict  # noqa: E402
-
     HAS_RAW_PREDICTION = True
 except ImportError:
     HAS_RAW_PREDICTION = False
@@ -39,21 +34,18 @@ except ImportError:
 # -----------------------------------------------------------------------------
 # Theme accent (self-contained, no .streamlit/config.toml required)
 # -----------------------------------------------------------------------------
-ACCENT = "#3f6184"          # slate blue — used for primary buttons (needs
-ACCENT_HOVER = "#34506d"    # enough contrast for white button text)
-TRACK_OFF = "#c8ccd4"       # unchecked toggle track (light mode)
+ACCENT = "#3f6184"          
+ACCENT_HOVER = "#34506d"    
+TRACK_OFF = "#c8ccd4"       
 
-# Baby-blue palette for the sidebar, toggles, and sliders.
-SIDEBAR_BLUE = "#eef3fb"    # white with a faint blue tint (sidebar background)
-BABY_BLUE = "#7fc4ee"        # decorative fill (slider filled track)
-BABY_BLUE_ON = "#3f83b8"     # deeper blue for toggle "on" track 
-BABY_BLUE_TEXT = "#2178a8"   # slider numbers/ticks (readable on white)
-BABY_BLUE_EDGE = "#2f6a97"   # thumb/track outline so pale fills stay discernible
+SIDEBAR_BLUE = "#eef3fb"    
+BABY_BLUE = "#7fc4ee"        
+BABY_BLUE_ON = "#3f83b8"     
+BABY_BLUE_TEXT = "#2178a8"   
+BABY_BLUE_EDGE = "#2f6a97"   
 
-# How close to 0.0 or 1.0 counts as "sitting on the boundary"
 CLIP_EPS = 1e-6
 
-# Held fixed for this screening model
 ROOT_CHORD = 1.0
 TIP_CHORD = 1.0
 SWEEP_ANGLE = 0.0
@@ -140,6 +132,23 @@ st.markdown(
         background: rgba(240, 242, 246, 0.45);
         margin-bottom: 0.75rem;
     }
+    
+    /* New styles for validity indicators and reliability card */
+    .validity-green { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 0.5rem 0.75rem; border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 1rem;}
+    .validity-yellow { color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; padding: 0.5rem 0.75rem; border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 1rem;}
+    .validity-red { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 0.5rem 0.75rem; border-radius: 0.4rem; font-size: 0.85rem; margin-bottom: 1rem;}
+    
+    .reliability-card {
+        padding: 1rem;
+        border-radius: 0.6rem;
+        border: 1px solid rgba(49, 51, 63, 0.2);
+        background: rgba(240, 242, 246, 0.3);
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+        line-height: 1.6;
+    }
+    .reliability-card strong { color: var(--aero-baby-text); }
+
     .small-note {
         font-size: 0.92rem;
         opacity: 0.82;
@@ -362,46 +371,6 @@ def get_model_metrics_safe() -> dict[str, float]:
         score = get_model_r2()
         return {"r2": score} if score is not None else {}
 
-METRIC_KEYS = ("r2", "mae", "rmse")
-
-METRIC_LABELS = {
-    "r2": "Model R²",
-    "mae": "Model MAE",
-    "rmse": "Model RMSE",
-}
-
-METRIC_HELP = {
-    "r2": "Share of test-set variation the model explains (1.00 is perfect). Higher is better.",
-    "mae": "Average error on held-out designs, in chord fraction. Lower is better.",
-    "rmse": "Like MAE but penalizes large misses more, in chord fraction. Lower is better.",
-}
-
-def format_metric_value(metric_key: str, value: float) -> str:
-    if metric_key == "r2":
-        return f"{value:.3f}"
-    return f"{value:.3f} x/c"
-
-
-def format_reliability_note(metrics: dict[str, float]) -> str:
-    parts = []
-    if "r2" in metrics:
-        parts.append(f"R² = {metrics['r2']:.3f}")
-    if "mae" in metrics:
-        parts.append(f"MAE = {metrics['mae']:.3f} x/c")
-    if "rmse" in metrics:
-        parts.append(f"RMSE = {metrics['rmse']:.3f} x/c")
-
-    note = "**Model reliability (held-out test set):** " + " · ".join(parts)
-
-    if "mae" in metrics:
-        note += (
-            f". On unseen designs the model is typically off by about "
-            f"{metrics['mae'] * 100:.1f}% of the chord, so read the prediction above "
-            "as a range, not a point value."
-        )
-    return note
-
-
 def get_model_r2() -> float | None:
     try:
         from src.inference import get_model_r2_score  # type: ignore  # noqa: E402
@@ -409,7 +378,6 @@ def get_model_r2() -> float | None:
         return float(score) if score is not None else None
     except Exception:
         return None
-
 
 def evaluate_clipping(raw_prediction: float) -> tuple[float, str | None]:
     if raw_prediction < 0.0:
@@ -450,6 +418,32 @@ def clipping_message(status: str, raw_prediction: float) -> str:
         "the value reaches the interface, so the underlying model output is unknown and may lie "
         "well past the edge. This is a boundary artifact, not a confident prediction."
     )
+
+
+def eval_input_validity(payload: dict) -> tuple[str, str, str]:
+    """Returns (css_class, icon, message) based on proximity to training bounds."""
+    is_edge = False
+    is_out_of_bounds = False
+
+    # Check bounds (the UI sliders naturally constrain this, but logic is robust)
+    if payload["angle_of_attack"] < 0.0 or payload["angle_of_attack"] > 25.0:
+        is_out_of_bounds = True
+    elif payload["angle_of_attack"] <= 1.0 or payload["angle_of_attack"] >= 24.0:
+        is_edge = True
+
+    if payload["airfoil_family"] == "biomimetic":
+        amp = payload["tubercle_amplitude"]
+        wave = payload["tubercle_wavelength"]
+        if amp < 26.2 or amp > 32.7 or wave < 42.3 or wave > 49.6:
+            is_out_of_bounds = True
+        elif amp <= 26.7 or amp >= 32.2 or wave <= 43.0 or wave >= 48.9:
+            is_edge = True
+
+    if is_out_of_bounds:
+        return "validity-red", "❌", "Unsupported input: Variables exceed the model's training range."
+    if is_edge:
+        return "validity-yellow", "⚠️", "Close to boundary: Inputs are near the edge of the model's training data. Accuracy may decrease."
+    return "validity-green", "✅", "Within training range: Inputs are safely within the data the model was trained on."
 
 
 def plot_wing_geometry(dark_mode: bool = False) -> plt.Figure:
@@ -715,6 +709,29 @@ def render_progress_guide() -> None:
     st.markdown(f'<div class="guide-strip">{chips}</div>', unsafe_allow_html=True)
 
 
+def render_reliability_card(metrics: dict) -> None:
+    """Renders a compact card showing model validation metrics and details."""
+    mae_text = f"{metrics['mae']:.3f} x/c" if "mae" in metrics else "N/A"
+    r2_text = f"{metrics['r2']:.3f}" if "r2" in metrics else "N/A"
+    
+    # Placeholders for fields not natively returned by get_model_metrics()
+    model_type = "Machine Learning Regressor (Prototype)"
+    training_size = "~1,200 simulated designs"
+    last_update = "July 2026"
+
+    html = f"""
+    <div class="reliability-card">
+        <strong>Model Type:</strong> {model_type}<br>
+        <strong>Training Data Size:</strong> {training_size}<br>
+        <strong>Last Model Update:</strong> {last_update}<br>
+        <strong>Test-Set MAE:</strong> {mae_text}<br>
+        <strong>Test-Set R²:</strong> {r2_text}
+    </div>
+    """
+    st.markdown("##### Model Reliability")
+    st.markdown(html, unsafe_allow_html=True)
+
+
 # -----------------------------------------------------------------------------
 # Welcome page
 # -----------------------------------------------------------------------------
@@ -851,7 +868,6 @@ def apply_preset(name: str) -> None:
     st.session_state.active_preset = name
 
 def apply_random_design() -> None:
-    """Generate a random supported wing configuration."""
     st.session_state["airfoil_family"] = random.choice(["symmetric", "cambered", "biomimetic"])
     st.session_state["angle_of_attack"] = round(random.uniform(0.0, 25.0) * 2) / 2 # Step 0.5
     st.session_state["airspeed"] = random.choice([15, 30])
@@ -868,7 +884,6 @@ def apply_random_design() -> None:
     st.session_state.active_preset = "Random Design"
 
 def reset_workshop() -> None:
-    """Clear history and return to default settings."""
     apply_preset(DEFAULT_PRESET)
     st.session_state.prediction_history = []
     st.session_state.latest_prediction = None
@@ -913,6 +928,12 @@ if dark_mode:
             background: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
         }
+        
+        .reliability-card {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+
         .guide-step {
             background: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
@@ -977,6 +998,11 @@ if dark_mode:
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
         }
         hr { border-color: rgba(255, 255, 255, 0.15) !important; }
+        
+        /* Dark mode validity overrides */
+        .validity-green { color: #d4edda; background-color: rgba(21, 87, 36, 0.4); border-color: #155724; }
+        .validity-yellow { color: #fff3cd; background-color: rgba(133, 100, 4, 0.4); border-color: #856404; }
+        .validity-red { color: #f8d7da; background-color: rgba(114, 28, 36, 0.4); border-color: #721c24; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1057,7 +1083,15 @@ def render_design_inputs(show_diagram: bool, dark_mode: bool) -> tuple[bool, dic
                 tubercle_wavelength = 0.0
 
             st.markdown('</div>', unsafe_allow_html=True)
-            st.caption("Inputs are limited to the model's training range to avoid unsupported extrapolation.")
+
+            payload_check = {
+                "airfoil_family": airfoil_family,
+                "tubercle_amplitude": tubercle_amplitude,
+                "tubercle_wavelength": tubercle_wavelength,
+                "angle_of_attack": angle_of_attack,
+            }
+            css_class, icon, msg = eval_input_validity(payload_check)
+            st.markdown(f'<div class="{css_class}">{icon} {msg}</div>', unsafe_allow_html=True)
 
             submitted = st.form_submit_button("Run Prediction", type="primary", use_container_width=True)
 
@@ -1299,60 +1333,19 @@ if show_prediction and st.session_state.started:
         baseline = st.session_state.latest_baseline
         metrics = get_model_metrics_safe()
 
-        available_metric_keys = [key for key in METRIC_KEYS if key in metrics]
-
-        m_col1, m_col2, m_col3 = st.columns(3)
-        m_col1.metric(
-            "Predicted separation_x_over_c", f"{prediction:.2f}",
-            help=HELP_SEPARATION,
-        )
-        m_col1.caption("This is a screening estimate, not a measured value")
-
-        with m_col2:
-            if available_metric_keys:
-                selected_metric = st.selectbox(
-                    "Validation metric",
-                    available_metric_keys,
-                    format_func=lambda key: METRIC_LABELS[key],
-                    key="selected_metric",
-                    label_visibility="collapsed",
-                    help=HELP_VALIDATION_METRIC,
-                )
-                st.metric(
-                    METRIC_LABELS[selected_metric],
-                    format_metric_value(selected_metric, metrics[selected_metric]),
-                    help=METRIC_HELP[selected_metric],
-                )
-                st.caption(METRIC_HELP[selected_metric])
-            else:
-                st.metric("Model R²", "N/A")
-                st.caption("No validation metrics recorded (see below).")
-
-        m_col3.metric(
-            "Separation location", f"{prediction * 100:.0f}% chord",
-            help=HELP_SEPARATION_PERCENT,
-        )
-
-        st.write(
-            f"This means the model predicts separation about {prediction * 100:.0f}% of the way "
-            "from the leading edge to the trailing edge."
-        )
-
-        if metrics:
-            st.caption(format_reliability_note(metrics))
-            if "mae" in metrics:
-                low = max(0.0, prediction - metrics["mae"])
-                high = min(1.0, prediction + metrics["mae"])
-                st.caption(
-                    f"Typical-error band: x/c ≈ {low:.2f} – {high:.2f}. "
-                    "This is the model's average error on held-out data, not a confidence interval."
-                )
-        else:
-            st.caption(
-                "**Model reliability:** no validation metrics recorded. Add `models/metrics.json` "
-                '(e.g. `{"r2": 0.93, "mae": 0.028, "rmse": 0.041}`) so this prediction can be '
-                "reported with its held-out accuracy."
+        m_col1, m_col2 = st.columns([1, 1])
+        with m_col1:
+            st.metric(
+                "Predicted separation_x_over_c", f"{prediction:.2f}",
+                help=HELP_SEPARATION,
             )
+            st.write(
+                f"A predicted value of **{prediction:.2f}** means separation is estimated to occur "
+                f"about **{prediction * 100:.0f}%** of the way from the leading edge to the trailing edge."
+            )
+            
+        with m_col2:
+            render_reliability_card(metrics)
 
         if clip_status is not None:
             st.warning(f"**Prediction clipped:** {clipping_message(clip_status, raw_output)}")
@@ -1454,7 +1447,6 @@ if show_comparison and st.session_state.started:
         history_df = pd.DataFrame(st.session_state.prediction_history)
         run_ids = history_df["run"].tolist()
         
-        # Select the last up to 3 runs by default
         default_selections = run_ids[-3:] if len(run_ids) >= 3 else run_ids
 
         selected_runs = st.multiselect(

@@ -1,0 +1,482 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Wing Lab game frontend: a Streamlit custom component written in plain JavaScript
+  (no build step, no libraries). It only draws and collects choices. Every model
+  prediction, distance and point total is computed in Python (wing_lab_core.py)
+  and arrives here in the "state" argument.
+
+  Streamlit component protocol used:
+    -> parent: streamlit:componentReady, streamlit:setComponentValue, streamlit:setFrameHeight
+    <- parent: streamlit:render  (event.data.args.state)
+-->
+<style>
+  :root { --panel:#0f2d44; --card:#173f5c; --card2:#1d4b6c; --ink:#f4f8fb; --muted:#a9c3d6;
+          --gold:#ffcc4d; --accent:#ff5a5f; --ok:#3ecf8e; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--panel); color:var(--ink);
+               font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #game { position:relative; border-radius:12px; overflow:hidden; background:var(--panel); }
+  #stage { position:relative; z-index:1; }
+  canvas { display:block; width:100%; position:absolute; left:0; top:0; z-index:0; }
+  #panel, #footer { position:relative; z-index:1; }
+  #controls { position:relative; z-index:1; background:rgba(12,36,58,.42); border-top:1px solid rgba(255,255,255,.18);
+              backdrop-filter:blur(9px) saturate(1.15); -webkit-backdrop-filter:blur(9px) saturate(1.15); }
+  .pill { position:absolute; padding:4px 10px; border-radius:999px; background:rgba(10,30,50,.42); backdrop-filter:blur(5px);
+          color:#fff; font-size:12px; }
+  #tag { left:10px; top:10px; max-width:calc(100% - 250px); }
+  #hud { right:10px; top:10px; text-align:right; padding:6px 12px; border-radius:10px; font-size:14px; }
+  #hud b { color:var(--gold); }
+  #hud .bar { height:5px; background:rgba(255,255,255,.25); border-radius:3px; margin-top:4px; }
+  #hud .bar i { display:block; height:100%; background:var(--gold); border-radius:3px; }
+  #hud small { color:#e3eef6; font-size:11px; }
+  #overlay { position:absolute; inset:52px 0 0 0; display:flex; align-items:center; justify-content:center;
+             pointer-events:none; }
+  #overlay > div { pointer-events:auto; }
+  .hidden { display:none !important; }
+  .dialog { background:rgba(16,44,70,.55); min-height:120px; backdrop-filter:blur(6px);
+            border:2px solid var(--gold); border-radius:12px; padding:12px 16px; font-size:16px; line-height:1.45; }
+  .dialog .who { color:var(--gold); font-weight:700; margin-bottom:4px; }
+  .dialog .btns { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+  .card-ov { background:rgba(14,40,64,.52); backdrop-filter:blur(7px) saturate(1.2); -webkit-backdrop-filter:blur(7px);
+             text-shadow:0 1px 2px rgba(0,0,0,.55); border:2px solid var(--gold); border-radius:14px;
+             padding:14px 18px; width:min(560px, 92%); max-height:calc(100% - 10px); font-size:14px;
+             display:flex; flex-direction:column; }
+  .card-ov .body { overflow:auto; min-height:0; }
+  .card-ov .foot { flex:0 0 auto; text-align:right; padding-top:10px; }
+  .card-ov h3 { margin:0 0 8px; font-size:20px; }
+  .row { display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,.08); }
+  .dot { width:12px; height:12px; border-radius:50%; flex:0 0 auto; }
+  .grow { flex:1; }
+  .big { font-size:18px; font-weight:700; }
+  .gold { color:var(--gold); }
+  .muted { color:var(--muted); font-size:12px; }
+  button { font:inherit; cursor:pointer; border-radius:8px; border:1px solid rgba(255,255,255,.35);
+           background:#2a5b80; color:#fff; padding:6px 12px; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.primary { background:var(--accent); border-color:var(--accent); font-weight:700; }
+  button.seg { padding:4px 10px; }
+  button.seg.on { background:var(--gold); color:#1b1b1b; border-color:var(--gold); font-weight:700; }
+  #panel { padding:10px 12px 12px; }
+  .strip { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .badge { font-size:12px; padding:3px 9px; border-radius:999px; background:rgba(31,140,90,.55); color:#fff;
+           border:1px solid rgba(255,255,255,.2); }
+  .badge.hint { background:rgba(255,255,255,.12); color:#e3eef6; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-bottom:8px; }
+  .controls label { font-size:14px; }
+  .lock { color:var(--muted); font-size:13px; }
+  .cards { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+  #tag .short { display:none; }
+  @media (max-width:640px) {
+    .cards { grid-template-columns:1fr; }
+    #tag .long { display:none; } #tag .short { display:inline; }
+    #hud { font-size:12px; padding:4px 8px; }
+    .card-ov { font-size:12px; padding:10px 12px; } .card-ov h3 { font-size:16px; } .big { font-size:15px; }
+    .dialog { font-size:14px; }
+    #footer { flex-wrap:wrap; } #envnote { flex-basis:100%; }
+  }
+  .wing { background:rgba(20,60,92,.5); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px; border-left:6px solid #999; font-size:13px; }
+  .wing .t { font-weight:700; font-size:14px; margin-bottom:4px; }
+  select, input[type=range] { width:100%; }
+  select { background:rgba(29,75,108,.7); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:6px; padding:4px; font:inherit; }
+  input[type=range] { accent-color: var(--gold); }
+  .scout { margin-top:4px; color:var(--gold); font-weight:700; }
+  #launch { width:100%; margin-top:10px; padding:10px; font-size:17px; }
+  .err { color:#ffb3b3; margin-top:6px; font-size:13px; }
+  #footer { display:flex; align-items:center; gap:10px; padding:2px 12px 10px; font-size:11px; color:var(--muted); }
+  #np { opacity:0; transition:opacity .6s; color:#fff; font-size:12px; background:rgba(255,255,255,.1);
+        padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  #np.show { opacity:1; }
+  #mute { padding:3px 10px; font-size:16px; line-height:1.2; }
+  #hud .env { font-size:12px; color:#e3eef6; margin-bottom:3px; }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="c"></canvas>
+  <div id="stage">
+    <span id="tag" class="pill"><span class="long">🎮 Game animation: conceptual, not a flow simulation</span><span class="short">🎮 Conceptual game animation</span></span>
+    <div id="hud" class="pill"></div>
+    <div id="overlay"></div>
+  </div>
+  <div id="controls">
+  <div id="panel"></div>
+  <div id="footer"><span id="envnote">🌦️ Weather and time of day are just scenery. They never change predictions, distances or points.</span>
+    <span class="grow"></span><span id="np"></span><button id="mute" aria-label="Mute music">🔊</button></div>
+  </div>
+</div>
+
+<script src="scene.js"></script>
+<script src="music.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+// Streamlit component plumbing
+// ---------------------------------------------------------------------------
+function post(type, extra) {
+  window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, extra), "*");
+}
+function send(action, extra) {
+  post("streamlit:setComponentValue", {
+    value: Object.assign({ action: action, nonce: Date.now() + "-" + Math.random() }, extra || {}),
+    dataType: "json",
+  });
+}
+function fitHeight() { post("streamlit:setFrameHeight", { height: document.getElementById("game").offsetHeight + 4 }); }
+new ResizeObserver(fitHeight).observe(document.body);
+
+// ---------------------------------------------------------------------------
+// Local UI state (the authoritative game state lives in Python)
+// ---------------------------------------------------------------------------
+const COLOURS = ["#ff8c42", "#e84a5f", "#a066d3"];
+const FAMILY = { symmetric: "Symmetric", cambered: "Cambered", biomimetic: "🐋 Whale wing" };
+const INTRO = [
+  { storm: true,  text: "My name is Link. Three weeks ago a storm smashed my little boat to pieces..." },
+  { storm: true,  text: "...and the waves washed me up here, on this tiny island. No radio. No boat. Just sand, palm trees and me." },
+  { text: "The mainland is 1,000 metres away. Too far to swim, and no ships ever pass this way." },
+  { bottle: true, text: "But I found an old glass bottle! If I put a message inside and glide it all the way to the mainland, someone will come and rescue me." },
+  { bottle: true, text: "I can build gliders from driftwood, palm leaves and scraps of sail. Each launch that beats my record earns points for better tools." },
+  { whale: true,  text: "Oh, and yesterday I saw a humpback whale. Its flippers have bumps along the front edge... I wonder if that idea could help a wing one day. Will you help me?" },
+];
+let S = null, gen = null, phase = "loading", cfg = null, lastRound = 0;
+let introIdx = 0, introStart = 0, anim = null, waitingSince = 0;
+const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const has = (k) => S && S.unlocks.indexOf(k) >= 0;
+
+window.addEventListener("message", (e) => {
+  const d = e.data;
+  if (!d || d.type !== "streamlit:render") return;
+  onState(d.args.state);
+});
+
+function onState(s) {
+  const fresh = S === null || s.gen !== gen;
+  const prevWaiting = phase === "waiting";
+  S = s; window.__lastRound = s.last_round;
+  if (fresh) {
+    gen = s.gen; cfg = clone(s.config); anim = null; window.__rescueSent = !!s.rescue_seen;
+    lastRound = s.last_round ? s.last_round.round : 0;
+    if (!s.intro_seen) { phase = "intro"; introIdx = 0; introStart = performance.now(); }
+    else if (s.won && !s.rescue_seen) startRescue();
+    else phase = s.won ? "rescued" : "build";
+  } else if (s.last_round && s.last_round.round > lastRound) {
+    lastRound = s.last_round.round; cfg = clone(s.config); startFlight(s.last_round);
+  } else if (prevWaiting) {
+    phase = "build";                          // launch rejected: show the error
+  }
+  renderAll();
+}
+
+// ---------------------------------------------------------------------------
+// World: all drawing lives in scene.js (Scene), music in music.js (Music).
+// Weather and time of day are scenery only; they never touch game results.
+// ---------------------------------------------------------------------------
+const LAUNCH_H = Scene.LAUNCH_H, LAND_H = Scene.LAND_H, DOCK_M = 955;
+const DARK = ["#c2551b", "#a3243a", "#6c3a9e"];
+const lerp = (a, b, t) => a + (b - a) * t;
+const gameEl = document.getElementById("game"), stageEl = document.getElementById("stage");
+let lastGameH = 0;
+function resize() {
+  Scene.resize(gameEl.offsetHeight);
+  stageEl.style.height = Scene.SH + "px";
+}
+window.addEventListener("resize", () => { resize(); fitHeight(); });
+new ResizeObserver(() => { if (Math.abs(gameEl.offsetHeight - lastGameH) > 1) { lastGameH = gameEl.offsetHeight; resize(); } }).observe(gameEl);
+resize();
+
+// ---------------------------------------------------------------------------
+// Animations
+// ---------------------------------------------------------------------------
+const DURATION = 4.0, STAGGER = 0.35;
+function pathAt(f, u) {
+  const end = f.reached ? LAND_H : 0, x = u * f.distance;
+  const y = u <= 0.3 ? LAUNCH_H + (f.height - LAUNCH_H) * Math.sin(u / 0.3 * Math.PI / 2)
+                     : end + (f.height - end) * Math.cos((u - 0.3) / 0.7 * Math.PI / 2);
+  return [x, y];
+}
+function startFlight(round) { anim = { type: "flight", start: performance.now(), round: round }; phase = "flying"; }
+function startRescue() { anim = { type: "rescue", start: performance.now() }; phase = "rescue"; renderPanel(); renderOverlay(); }
+
+function drawFlights(g, round, t) {
+  const sx = Scene.sx, sy = Scene.sy, HZ = Scene.HZ, S = Math.max(.6, Scene.S);
+  let done = true;
+  round.flights.forEach((f, i) => {
+    const u = reduceMotion ? 1 : Math.max(0, Math.min(1, (t - i * STAGGER) / DURATION));
+    if (u < 1) done = false;
+    // fading trail
+    let prev = null;
+    g.strokeStyle = COLOURS[i]; g.lineCap = "round";
+    for (let k = 0; k <= 48; k++) {
+      const [px, py] = pathAt(f, u * k / 48), p = [sx(px), sy(py)];
+      if (prev) { g.globalAlpha = 0.06 + 0.5 * k / 48; g.lineWidth = 1 + 3 * k / 48; g.beginPath(); g.moveTo(...prev); g.lineTo(...p); g.stroke(); }
+      prev = p;
+    }
+    g.globalAlpha = 1;
+    const [x, y] = pathAt(f, u), [x2, y2] = pathAt(f, Math.min(1, u + 0.01));
+    if (u < 1) {
+      g.fillStyle = `rgba(0,25,45,${0.25 * (1 - Math.min(1, y / 200))})`;          // shadow on the water
+      g.beginPath(); g.ellipse(sx(x), HZ + 5, 16 * S, 2.5 * S, 0, 0, 7); g.fill();
+      Scene.drawGlider(g, sx(x), sy(y), Math.atan2(sy(y2) - sy(y), sx(x2) - sx(x) + 1e-6), COLOURS[i], DARK[i]);
+    } else {
+      const since = t - i * STAGGER - DURATION, gx = sx(x), gy = f.reached ? sy(LAND_H) : HZ;
+      if (!f.reached && since < 1.6 && !reduceMotion) {                           // splash
+        for (let j = 0; j < 14; j++) {
+          const a = -Math.PI / 2 + (j / 13 - .5) * 1.6, v = (30 + (j * 37 % 23)) * S;
+          const px = gx + Math.cos(a) * v * since * 1.4, py = gy + Math.sin(a) * v * since * 2.2 + 60 * S * since * since;
+          if (py <= gy + 2) { g.fillStyle = `rgba(235,246,255,${1 - since / 1.6})`; g.beginPath(); g.arc(px, py, 1.8 * S, 0, 7); g.fill(); }
+        }
+        [0, .35].forEach((d) => {
+          const s2 = since - d; if (s2 <= 0) return;
+          g.strokeStyle = `rgba(255,255,255,${Math.max(0, .9 - s2 / 1.4)})`; g.lineWidth = 1.6;
+          g.beginPath(); g.ellipse(gx, gy + 3, (6 + s2 * 26) * S, (2 + s2 * 5) * S, 0, 0, 7); g.stroke();
+        });
+      }
+      if (f.reached || since > 0.4) Scene.drawGlider(g, gx, gy - (f.reached ? 6 : 2) * S, f.reached ? 0 : 0.12, COLOURS[i], DARK[i]);
+      g.fillStyle = COLOURS[i]; g.fillRect(gx - 1, gy - (30 + i * 6) * S, 2, (30 + i * 6) * S);
+      g.beginPath(); g.arc(gx, gy - (34 + i * 6) * S, 8.5 * S + 1, 0, 7); g.fill();
+      g.fillStyle = "#fff"; g.font = `bold ${Math.max(8, 10 * S)}px system-ui`; g.textAlign = "center";
+      g.fillText("ABC"[i], gx, gy - (30.5 + i * 6) * S);
+    }
+  });
+  return done;
+}
+
+function drawWreckage(g, t) {
+  const sx = Scene.sx, HZ = Scene.HZ, S = Math.max(.6, Scene.S);
+  [[140, .4], [270, -.3], [360, .2], [470, -.15]].forEach(([m, r], i) => {
+    g.save(); g.translate(sx(m), HZ + 3 + Math.sin(t * 2 + i) * 3); g.rotate(r + Math.sin(t * 1.3 + i) * .1);
+    g.fillStyle = "#6e4b2a"; g.fillRect(-15 * S, -3 * S, 30 * S, 6 * S); g.fillStyle = "#8a6238"; g.fillRect(-15 * S, -3 * S, 30 * S, 2 * S);
+    g.restore();
+  });
+}
+function drawWhale(g, t) {
+  const wx = Scene.sx(560), wy = Scene.HZ + 2, S = Math.max(.6, Scene.S), lift = (Math.sin(t * .9) * .5 + .5) * 8 * S;
+  g.fillStyle = "#2f3e4c";
+  g.beginPath(); g.moveTo(wx, wy); g.quadraticCurveTo(wx - 4 * S, wy - 26 * S - lift, wx - 24 * S, wy - 36 * S - lift);
+  g.quadraticCurveTo(wx, wy - 28 * S - lift, wx + 24 * S, wy - 36 * S - lift); g.quadraticCurveTo(wx + 4 * S, wy - 26 * S - lift, wx, wy); g.fill();
+  g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 1.5;
+  g.beginPath(); g.ellipse(wx, wy + 2, 30 * S, 4 * S, 0, 0, 7); g.stroke();
+}
+
+let lastT = performance.now(), envTick = 0, introWeather = null;
+function frame(now) {
+  const t = now / 1000, dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+  if (phase === "intro") {
+    const want = INTRO[introIdx].storm ? "storm" : "clear";
+    if (want !== introWeather) { introWeather = want; if (want === "storm") Scene.force("storm"); else Scene.release("sunny"); }
+  } else if (introWeather === "storm") { introWeather = "clear"; Scene.release("sunny"); }
+  Scene.update(dt, now);
+  if (now - envTick > 500) { envTick = now; const el = document.getElementById("env"); if (el) el.textContent = Scene.clockLabel(); }
+
+  let banner = null, bubble = null;
+  Scene.render(t, now, (g) => {
+    const geo = Scene.geo, S = Scene.S, HZ = Scene.HZ, linkY = geo.islandY(geo.linkX);
+    if (phase === "intro") {
+      const line = INTRO[introIdx];
+      if (line.storm) drawWreckage(g, t);
+      Scene.drawLink(g, geo.linkX, linkY, t, line.storm ? "sad" : "wave");
+      if (line.bottle || line.whale) Scene.drawBottle(g, geo.linkX + 14 * Math.max(.6, S), linkY);
+      if (line.whale) drawWhale(g, t);
+      const el = document.getElementById("introText");
+      if (el) { const n = reduceMotion ? 9999 : Math.floor((now - introStart) / 22); el.textContent = line.text.slice(0, n); }
+      return null;
+    }
+    if (phase === "flying" && anim) {
+      Scene.drawLink(g, geo.linkX, linkY, t, "excited");
+      bubble = "Go, go, go!";
+      const el = (now - anim.start) / 1000, done = drawFlights(g, anim.round, el);
+      if (done && el > STAGGER * 2 + DURATION + 0.8) {
+        if (anim.round.flights.some((f) => f.reached)) startRescue(); else { phase = "results"; renderAll(); }
+      }
+      return null;
+    }
+    if (phase === "rescue" && anim) {
+      // 0-1.5 s message delivered, 1.5-5.5 boat sails to the island, 5.5-6.5 Link boards, 6.5-10.5 sail home
+      const e = reduceMotion ? 99 : (now - anim.start) / 1000;
+      if (window.__lastRound) drawFlights(g, window.__lastRound, 99);
+      const islandX = geo.boatIsland, homeX = Scene.sx(DOCK_M);
+      let bx, onBoat = false;
+      if (e < 1.5) bx = homeX;
+      else if (e < 5.5) bx = lerp(homeX, islandX, (e - 1.5) / 4);
+      else if (e < 6.5) { bx = islandX; onBoat = e > 6.0; }
+      else { bx = lerp(islandX, homeX, Math.min(1, (e - 6.5) / 4)); onBoat = true; }
+      const lamp = e >= 1.5 ? Scene.drawBoat(g, bx, t, onBoat) : Scene.drawBoat(g, homeX, t, false);
+      if (!onBoat) {
+        const k = e > 5.5 ? Math.min(1, (e - 5.5) / 0.5) : 0;
+        Scene.drawLink(g, lerp(geo.linkX, islandX - 24 * Math.max(.55, S), k), lerp(linkY, HZ, k), t, true);
+      }
+      banner = e < 1.5 ? "📨 Message delivered!" : e < 6.5 ? "🚢 A rescue boat is on the way!" : "🎉 Link is rescued!";
+      if (e > 10.8) { phase = "rescued"; renderAll(); if (!window.__rescueSent) { window.__rescueSent = true; send("rescue_done"); } }
+      return [lamp];
+    }
+    if (phase === "rescued") return [Scene.drawBoat(g, Scene.sx(DOCK_M), t, true)];
+    if (phase === "results" && window.__lastRound) {
+      bubble = window.__lastRound.new_record ? "Aww... so close! New record, though." : "Aww... it crashed.";
+      Scene.drawLink(g, geo.linkX, linkY, t, "sad");
+    } else Scene.drawLink(g, geo.linkX, linkY, t, "wave");
+    if (phase === "results" && window.__lastRound) drawFlights(g, window.__lastRound, 99);
+    return null;
+  });
+
+  if (bubble) {
+    const s = Math.max(.55, Scene.S) * 1.05, geo = Scene.geo;
+    Scene.drawBubble(Scene.ctx, geo.linkX + 8 * s, geo.islandY(geo.linkX) - 76 * s, bubble);
+  }
+  if (banner) {
+    const c = Scene.ctx, W = Scene.W;
+    c.font = `bold ${W < 640 ? 16 : 24}px system-ui`; c.textAlign = "center";
+    const mw = c.measureText(banner).width + 40, my = Scene.HZ * 0.36;
+    c.fillStyle = "rgba(20,110,60,.9)"; c.beginPath(); c.roundRect(W / 2 - mw / 2, my - 31, mw, 46, 12); c.fill();
+    c.fillStyle = "#fff"; c.fillText(banner, W / 2, my);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------------------------------------------------------------------------
+// Music controls (bottom-right): "Now Playing" toast + mute button
+// ---------------------------------------------------------------------------
+const npEl = document.getElementById("np"), muteEl = document.getElementById("mute");
+let npTimer = null;
+function toast(text, ms) {
+  npEl.textContent = text; npEl.classList.add("show");
+  clearTimeout(npTimer); npTimer = setTimeout(() => npEl.classList.remove("show"), ms || 4500);
+}
+Music.onNowPlaying = (title) => toast("🎵 Now Playing: " + title);
+function showMute(m) { muteEl.textContent = m ? "🔇" : "🔊"; muteEl.title = m ? "Turn music on" : "Mute music"; }
+Music.onMuteChange = showMute;
+showMute(Music.muted);
+muteEl.addEventListener("pointerdown", (e) => e.stopPropagation());
+muteEl.onclick = () => Music.toggle();
+document.addEventListener("pointerdown", () => { if (!Music.muted) Music.begin(); });
+Scene.onLightning = () => Music.thunder();
+Music.mood = () => Scene.mood();
+if (!Music.muted) toast("🔈 Music starts when you click in the game", 5000);
+
+// ---------------------------------------------------------------------------
+// HTML: HUD, overlays, controls panel
+// ---------------------------------------------------------------------------
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function renderAll() { renderHud(); renderOverlay(); renderPanel(); fitHeight(); }
+
+function renderHud() {
+  const hud = document.getElementById("hud");
+  if (!S || phase === "intro") { hud.classList.add("hidden"); return; }
+  hud.classList.remove("hidden");
+  hud.innerHTML = `<div class="env" id="env">${Scene.clockLabel()}</div>⭐ <b>${S.points}</b> pts &nbsp; 🏆 <b>${Math.round(S.best)} m</b> &nbsp; 🚀 Round ${S.rounds_flown}`;
+}
+
+function renderOverlay() {
+  const ov = document.getElementById("overlay");
+  if (phase === "intro") { ov.innerHTML = ""; return; }   // the intro dialog is drawn in the panel
+  if (phase === "results" && S.last_round) {
+    const r = S.last_round;
+    const rows = r.flights.map((f, i) => `<div class="row"><span class="dot" style="background:${COLOURS[i]}"></span>
+      <span class="grow"><b>${esc(f.name)}</b> · ${esc(FAMILY[f.family])}${f.family === "biomimetic" ? " (" + f.amp.toFixed(1) + " mm bumps)" : ""}<br>
+      <span class="muted">${f.angle}° · ${f.speed} m/s · model x/c <b>${f.x.toFixed(2)}</b></span></span>
+      <span class="big">${Math.round(f.distance)} m</span></div>`).join("");
+    const pts = r.new_record
+      ? `<div class="big gold" style="margin-top:8px">🏆 New record! +${r.points_earned} ⭐</div>`
+      : `<div class="big" style="margin-top:8px">No new record, so no points this round.</div>
+         <div class="muted">Try changing one thing at a time to see what helps.</div>`;
+    const unl = r.new_unlocks.map(u => `<div style="margin-top:6px">🔓 <b>${esc(u.title)}</b>: ${esc(u.text)}</div>`).join("");
+    ov.innerHTML = `<div class="card-ov"><h3>Round ${r.round} results</h3><div class="body">${rows}${pts}
+      <div style="margin-top:4px">Total: <b class="gold">${S.points} ⭐</b> &nbsp; Record: <b>${Math.round(S.best)} m</b></div>${unl}
+      <div class="muted" style="margin-top:8px">x/c = real model prediction · distance and points = game rules</div></div>
+      <div class="foot"><button class="primary" id="nextRound">🛠️ Build next round</button></div></div>`;
+    document.getElementById("nextRound").onclick = toBuild;
+    return;
+  }
+  if (phase === "rescued") {
+    ov.innerHTML = `<div class="card-ov" style="text-align:center"><h3>🎉 Link is rescued!</h3>
+      <div>The message reached the mainland in round ${S.rounds_flown}. Total: <b class="gold">${S.points} ⭐</b></div>
+      <div class="muted" style="margin:8px 0">Scroll down to find out what was real and what was game.</div>
+      <button id="again">🔄 Play again</button></div>`;
+    document.getElementById("again").onclick = () => send("restart");
+    return;
+  }
+  ov.innerHTML = "";
+}
+
+function finishIntro() { phase = "build"; renderAll(); send("intro_done"); }
+function toBuild() { phase = "build"; renderAll(); }
+
+function renderPanel() {
+  const panel = document.getElementById("panel");
+  if (!S || phase === "loading") { panel.innerHTML = ""; return; }
+  if (phase === "intro") {
+    const last = introIdx === INTRO.length - 1;
+    panel.innerHTML = `<div class="dialog"><div class="who">🧍 Link</div><div id="introText"></div>
+      <div class="btns"><button id="skip">Skip intro</button>
+      <button class="primary" id="next">${last ? "Let's build! 🛠️" : "Next ▶"}</button></div></div>`;
+    document.getElementById("next").onclick = () => {
+      if (introIdx < INTRO.length - 1) { introIdx++; introStart = performance.now(); renderPanel(); }
+      else finishIntro();
+    };
+    document.getElementById("skip").onclick = finishIntro;
+    return;
+  }
+  if (phase === "rescue" || phase === "rescued") {
+    panel.innerHTML = `<div class="muted" style="padding:6px 2px">🎉 Workshop closed: Link is going home!</div>`; return;
+  }
+  const busy = phase !== "build";
+  const earned = S.upgrades.filter((u) => has(u.key));
+  const strip = earned.length
+    ? earned.map((u) => `<span class="badge">✓ ${esc(u.title)} · earned at ${u.points}⭐</span>`).join("")
+    : `<span class="badge hint">🧰 Beat your record to earn upgrades for the workshop!</span>`;
+  const angle = has("angle")
+    ? `<label>📐 Launch angle <b id="angVal">${cfg.angle}°</b><br><input id="ang" type="range" min="0" max="24" step="1" value="${cfg.angle}" ${busy ? "disabled" : ""}></label>`
+    : "";
+  const speed = has("speed")
+    ? `<span>💨 Speed ${S.speeds.map(v => `<button class="seg ${cfg.speed === v ? "on" : ""}" data-speed="${v}" ${busy ? "disabled" : ""}>${v} m/s</button>`).join(" ")}</span>`
+    : "";
+  const scoutBtn = has("wind_scout") ? `<button id="scout" ${busy ? "disabled" : ""}>🔭 Scout x/c</button>` : "";
+  const scoutOk = S.scout && JSON.stringify(S.scout.config) === JSON.stringify(cfg);
+  const families = ["symmetric", "cambered"].concat(has("biomimetic") ? ["biomimetic"] : []);
+  const cards = [0, 1, 2].map(i => {
+    const fam = cfg.families[i], st = S.starters[i];
+    const famCtl = has("wing_types")
+      ? `<select data-fam="${i}" ${busy ? "disabled" : ""}>${families.map(f => `<option value="${f}" ${f === fam ? "selected" : ""}>${FAMILY[f]}</option>`).join("")}</select>`
+      : `${FAMILY[fam]} 🔒`;
+    let bump = "";
+    if (fam === "biomimetic") {
+      const g = S.bumps[cfg.bumps[i]];
+      bump = has("bump_height")
+        ? `<div style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b><input type="range" min="0" max="${S.bumps.length - 1}" step="1" value="${cfg.bumps[i]}" data-bump="${i}" ${busy ? "disabled" : ""}></div>`
+        : `<div style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b> 🔒</div>`;
+      bump += `<div class="muted">Bumps ${g.amp.toFixed(1)} mm tall, ${g.wave.toFixed(1)} mm apart</div>`;
+    }
+    const ang = has("angle") ? cfg.angle : st.angle;
+    const scout = scoutOk ? `<div class="scout">🔭 Model x/c ${S.scout.x[i].toFixed(2)}</div>` : "";
+    return `<div class="wing" style="border-left-color:${COLOURS[i]}"><div class="t">Wing ${"ABC"[i]} · ${esc(st.name)}</div>
+      ${famCtl}${bump}<div class="muted" style="margin-top:4px">${ang}° · ${has("speed") ? cfg.speed : S.speeds[0]} m/s</div>${scout}</div>`;
+  }).join("");
+  const label = phase === "waiting" ? "⏳ Launching..." : phase === "flying" ? "✈️ Flying..." : phase === "results" ? "🛠️ Build next round" : "🚀 Launch!";
+  panel.innerHTML = `<div class="strip">${strip}</div>
+    ${angle || speed || scoutBtn ? `<div class="controls">${angle}${speed}${scoutBtn}</div>` : ""}
+    ${has("bump_height") ? '<div class="muted" style="margin-bottom:6px">In the CFD data, bump height and spacing always changed together, so the six real designs are offered as pairs.</div>' : ""}
+    <div class="cards">${cards}</div>
+    <button id="launch" class="primary" ${busy && phase !== "results" ? "disabled" : ""}>${label}</button>
+    ${S.error ? `<div class="err">⚠️ ${esc(S.error)}</div>` : ""}`;
+
+  const q = (sel) => panel.querySelector(sel);
+  if (q("#ang")) q("#ang").oninput = (e) => { cfg.angle = +e.target.value; q("#angVal").textContent = cfg.angle + "°"; };
+  if (q("#ang")) q("#ang").onchange = () => renderPanel();
+  panel.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => { cfg.speed = +b.dataset.speed; renderPanel(); });
+  panel.querySelectorAll("[data-fam]").forEach(s => s.onchange = () => { cfg.families[+s.dataset.fam] = s.value; renderPanel(); fitHeight(); });
+  panel.querySelectorAll("[data-bump]").forEach(r => {
+    r.oninput = () => { cfg.bumps[+r.dataset.bump] = +r.value; };
+    r.onchange = () => renderPanel();
+  });
+  if (q("#scout")) q("#scout").onclick = () => send("scout", { config: cfg });
+  q("#launch").onclick = () => { if (phase === "results") return toBuild(); phase = "waiting"; waitingSince = performance.now(); renderPanel(); send("launch", { config: cfg }); };
+}
+
+post("streamlit:componentReady", { apiVersion: 1 });
+</script>
+</body>
+</html>

@@ -80,6 +80,12 @@
   .scout { margin-top:4px; color:var(--gold); font-weight:700; }
   #launch { width:100%; margin-top:10px; padding:10px; font-size:17px; }
   .err { color:#ffb3b3; margin-top:6px; font-size:13px; }
+  #footer { display:flex; align-items:center; gap:10px; padding:2px 12px 10px; font-size:11px; color:var(--muted); }
+  #np { opacity:0; transition:opacity .6s; color:#fff; font-size:12px; background:rgba(255,255,255,.1);
+        padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  #np.show { opacity:1; }
+  #mute { padding:3px 10px; font-size:16px; line-height:1.2; }
+  #hud .env { font-size:12px; color:#e3eef6; margin-bottom:3px; }
 </style>
 </head>
 <body>
@@ -91,8 +97,12 @@
     <div id="overlay"></div>
   </div>
   <div id="panel"></div>
+  <div id="footer"><span id="envnote">🌦️ Weather and time of day are just scenery. They never change predictions, distances or points.</span>
+    <span class="grow"></span><span id="np"></span><button id="mute" aria-label="Mute music">🔊</button></div>
 </div>
 
+<script src="scene.js"></script>
+<script src="music.js"></script>
 <script>
 // ---------------------------------------------------------------------------
 // Streamlit component plumbing
@@ -137,9 +147,9 @@ window.addEventListener("message", (e) => {
 function onState(s) {
   const fresh = S === null || s.gen !== gen;
   const prevWaiting = phase === "waiting";
-  S = s;
+  S = s; window.__lastRound = s.last_round;
   if (fresh) {
-    gen = s.gen; cfg = clone(s.config); anim = null;
+    gen = s.gen; cfg = clone(s.config); anim = null; window.__rescueSent = !!s.rescue_seen;
     lastRound = s.last_round ? s.last_round.round : 0;
     if (!s.intro_seen) { phase = "intro"; introIdx = 0; introStart = performance.now(); }
     else if (s.won && !s.rescue_seen) startRescue();
@@ -153,113 +163,15 @@ function onState(s) {
 }
 
 // ---------------------------------------------------------------------------
-// Canvas world
+// World: all drawing lives in scene.js (Scene), music in music.js (Music).
+// Weather and time of day are scenery only; they never touch game results.
 // ---------------------------------------------------------------------------
-const cv = document.getElementById("c"), ctx = cv.getContext("2d");
-let W = 0, H = 0;
-function resize() {
-  const dpr = window.devicePixelRatio || 1;
-  W = cv.clientWidth; H = W < 640 ? 400 : 440;
-  cv.style.height = H + "px"; cv.width = W * dpr; cv.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
+const LAUNCH_H = Scene.LAUNCH_H, LAND_H = Scene.LAND_H, DOCK_M = 955;
+const DARK = ["#c2551b", "#a3243a", "#6c3a9e"];
+const lerp = (a, b, t) => a + (b - a) * t;
+function resize() { Scene.resize(); }
 window.addEventListener("resize", () => { resize(); fitHeight(); });
 resize();
-
-const X0 = -90, X1 = 1180, YMAX = 240, LAUNCH_H = 22, LAND_H = 14;
-const SEA = () => H - 46;
-const sx = (m) => (m - X0) / (X1 - X0) * W;
-const sy = (m) => SEA() - m / YMAX * (SEA() - 40);
-const ISLAND_X = -30, DOCK_X = 935;   // where the rescue boat waits at the mainland shore
-
-function drawScene(t, storm) {
-  const g = ctx.createLinearGradient(0, 0, 0, SEA());
-  if (storm) { g.addColorStop(0, "#2c3e50"); g.addColorStop(1, "#5d6d7e"); }
-  else { g.addColorStop(0, "#7cc4f2"); g.addColorStop(1, "#d8f0ff"); }
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, SEA());
-  ctx.fillStyle = storm ? "rgba(180,190,200,.9)" : "rgba(255,255,255,.88)";
-  [[120, 60], [420, 95], [760, 55], [980, 105]].forEach(([cx, cy], i) => {
-    const px = ((sx(cx) + t * (storm ? 40 : 12) * (i % 2 + 1)) % (W + 140)) - 70;
-    [0, 20, 40].forEach((o, k) => { ctx.beginPath(); ctx.arc(px + o, cy + (k === 1 ? -9 : 0), 18, 0, 7); ctx.fill(); });
-  });
-  if (storm) {                                   // rain + lightning flicker
-    ctx.strokeStyle = "rgba(220,230,255,.5)"; ctx.lineWidth = 1;
-    for (let i = 0; i < 90; i++) {
-      const x = (i * 97 + t * 400) % W, y = (i * 53 + t * 700) % SEA();
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 12); ctx.stroke();
-    }
-    if (Math.sin(t * 3.1) > 0.985) { ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(0, 0, W, H); }
-  }
-  ctx.fillStyle = storm ? "#1b4f72" : "#1f78b4"; ctx.fillRect(0, SEA(), W, H - SEA());
-  ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = 1.5;
-  for (let row = 0; row < 3; row++) {
-    ctx.beginPath();
-    for (let px = 0; px <= W; px += 6) {
-      const py = SEA() + 8 + row * 12 + Math.sin(px / 22 + t * 2 + row) * (storm ? 5 : 2.5);
-      px === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-    }
-    ctx.stroke();
-  }
-  // island + palm
-  ctx.fillStyle = "#f3d58a";
-  ctx.beginPath(); ctx.moveTo(sx(-90), SEA()); ctx.quadraticCurveTo(sx(-45), sy(LAUNCH_H + 14), sx(8), SEA()); ctx.fill();
-  ctx.strokeStyle = "#7a4e1d"; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(sx(-58), sy(16)); ctx.quadraticCurveTo(sx(-66), sy(45), sx(-54), sy(70)); ctx.stroke();
-  ctx.fillStyle = "#2f8f46";
-  for (let k = 0; k < 5; k++) {
-    const sway = storm ? Math.sin(t * 4 + k) * 0.3 : 0;
-    ctx.beginPath(); ctx.ellipse(sx(-54) + Math.cos(k * 1.3) * 15, sy(70) + Math.sin(k * 1.3) * 5, 17, 5, k * 1.3 + sway, 0, 7); ctx.fill();
-  }
-  // mainland
-  ctx.fillStyle = "#5caa4f";
-  ctx.beginPath(); ctx.moveTo(sx(1000 - 25), SEA()); ctx.quadraticCurveTo(sx(1000), sy(LAND_H), sx(1040), sy(LAND_H));
-  ctx.lineTo(W, sy(LAND_H)); ctx.lineTo(W, SEA()); ctx.fill();
-  ctx.fillStyle = "#a0522d"; ctx.fillRect(sx(1110), sy(LAND_H + 16), 22, sy(LAND_H) - sy(LAND_H + 16));
-  ctx.fillStyle = "#c0392b"; ctx.beginPath(); ctx.moveTo(sx(1104), sy(LAND_H + 16)); ctx.lineTo(sx(1121), sy(LAND_H + 27)); ctx.lineTo(sx(1138), sy(LAND_H + 16)); ctx.fill();
-  ctx.fillStyle = "#fff"; ctx.font = "bold " + (W < 640 ? 10 : 12) + "px system-ui"; ctx.textAlign = "right";
-  ctx.fillText("MAINLAND", W - 8, sy(LAND_H) + 18);
-  ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.font = "11px system-ui"; ctx.textAlign = "center";
-  for (let m = 0; m <= 1000; m += 200) { ctx.fillRect(sx(m) - 0.5, H - 14, 1, 6); ctx.fillText(m + " m", sx(m), H - 2); }
-  if (storm) {                                   // wreckage
-    ctx.fillStyle = "#6e4b2a";
-    [[120, 0.4], [260, -0.3], [330, 0.2]].forEach(([m, r], i) => {
-      ctx.save(); ctx.translate(sx(m), SEA() + 4 + Math.sin(t * 2 + i) * 3); ctx.rotate(r); ctx.fillRect(-14, -3, 28, 6); ctx.restore();
-    });
-  }
-}
-
-function drawLink(x, y, t, waving) {
-  ctx.strokeStyle = "#222"; ctx.lineWidth = 2.2;
-  ctx.fillStyle = "#f1c27d"; ctx.beginPath(); ctx.arc(x, y - 19, 5, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = "#2b6cb0"; ctx.lineWidth = 4;                       // shirt
-  ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.lineTo(x, y - 3); ctx.stroke();
-  ctx.strokeStyle = "#222"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x - 4, y + 7); ctx.moveTo(x, y - 3); ctx.lineTo(x + 4, y + 7);
-  ctx.moveTo(x, y - 11); ctx.lineTo(x - 7, y - 5);
-  const a = waving ? -1.3 + Math.sin(t * 7) * 0.5 : 0.9;
-  ctx.moveTo(x, y - 11); ctx.lineTo(x + Math.cos(a) * 10, y - 11 + Math.sin(a) * 10); ctx.stroke();
-}
-function drawBottle(x, y) {
-  ctx.fillStyle = "rgba(120,200,160,.9)"; ctx.strokeStyle = "#1c5b45"; ctx.lineWidth = 1;
-  ctx.fillRect(x - 3, y - 8, 6, 9); ctx.strokeRect(x - 3, y - 8, 6, 9);
-  ctx.fillRect(x - 1.5, y - 12, 3, 4); ctx.fillStyle = "#fff"; ctx.fillRect(x - 1.5, y - 6, 3, 4);
-}
-function drawGlider(x, y, angle, colour) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
-  ctx.fillStyle = colour; ctx.strokeStyle = "#1b1b1b"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(-9, -8); ctx.lineTo(-4, 0); ctx.lineTo(-9, 8); ctx.closePath();
-  ctx.fill(); ctx.stroke(); ctx.restore();
-  drawBottle(x, y + 12);
-}
-function drawBoat(x, y, t) {
-  const bob = Math.sin(t * 3) * 2;
-  ctx.save(); ctx.translate(x, y + bob);
-  ctx.fillStyle = "#c0392b"; ctx.beginPath(); ctx.moveTo(-34, -6); ctx.lineTo(34, -6); ctx.lineTo(24, 8); ctx.lineTo(-24, 8); ctx.fill();
-  ctx.fillStyle = "#fff"; ctx.fillRect(-12, -20, 22, 14); ctx.fillStyle = "#4aa3df"; ctx.fillRect(-8, -17, 6, 6); ctx.fillRect(2, -17, 6, 6);
-  ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(14, -6); ctx.lineTo(14, -32); ctx.stroke();
-  ctx.fillStyle = "#f1c40f"; ctx.beginPath(); ctx.moveTo(14, -32); ctx.lineTo(28, -27); ctx.lineTo(14, -22); ctx.fill();
-  ctx.restore();
-}
 
 // ---------------------------------------------------------------------------
 // Animations
@@ -274,92 +186,152 @@ function pathAt(f, u) {
 function startFlight(round) { anim = { type: "flight", start: performance.now(), round: round }; phase = "flying"; }
 function startRescue() { anim = { type: "rescue", start: performance.now() }; phase = "rescue"; renderPanel(); renderOverlay(); }
 
-function drawFlights(round, t) {
+function drawFlights(g, round, t) {
+  const sx = Scene.sx, sy = Scene.sy, HZ = Scene.HZ, S = Math.max(.6, Scene.S);
   let done = true;
   round.flights.forEach((f, i) => {
     const u = reduceMotion ? 1 : Math.max(0, Math.min(1, (t - i * STAGGER) / DURATION));
     if (u < 1) done = false;
-    ctx.strokeStyle = COLOURS[i]; ctx.globalAlpha = 0.6; ctx.setLineDash([5, 5]); ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let k = 0; k <= 60; k++) { const [px, py] = pathAt(f, u * k / 60); k ? ctx.lineTo(sx(px), sy(py)) : ctx.moveTo(sx(px), sy(py)); }
-    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    // fading trail
+    let prev = null;
+    g.strokeStyle = COLOURS[i]; g.lineCap = "round";
+    for (let k = 0; k <= 48; k++) {
+      const [px, py] = pathAt(f, u * k / 48), p = [sx(px), sy(py)];
+      if (prev) { g.globalAlpha = 0.06 + 0.5 * k / 48; g.lineWidth = 1 + 3 * k / 48; g.beginPath(); g.moveTo(...prev); g.lineTo(...p); g.stroke(); }
+      prev = p;
+    }
+    g.globalAlpha = 1;
     const [x, y] = pathAt(f, u), [x2, y2] = pathAt(f, Math.min(1, u + 0.01));
-    if (u < 1) drawGlider(sx(x), sy(y), Math.atan2(sy(y2) - sy(y), sx(x2) - sx(x) + 1e-6), COLOURS[i]);
-    else {
-      const since = t - i * STAGGER - DURATION, gy = f.reached ? sy(LAND_H) : SEA();
-      if (!f.reached && since < 1.4 && !reduceMotion) {
-        ctx.strokeStyle = "rgba(255,255,255," + (1 - since / 1.4) + ")"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.ellipse(sx(x), SEA() + 3, 6 + since * 22, 2 + since * 5, 0, 0, 7); ctx.stroke();
+    if (u < 1) {
+      g.fillStyle = `rgba(0,25,45,${0.25 * (1 - Math.min(1, y / 200))})`;          // shadow on the water
+      g.beginPath(); g.ellipse(sx(x), HZ + 5, 16 * S, 2.5 * S, 0, 0, 7); g.fill();
+      Scene.drawGlider(g, sx(x), sy(y), Math.atan2(sy(y2) - sy(y), sx(x2) - sx(x) + 1e-6), COLOURS[i], DARK[i]);
+    } else {
+      const since = t - i * STAGGER - DURATION, gx = sx(x), gy = f.reached ? sy(LAND_H) : HZ;
+      if (!f.reached && since < 1.6 && !reduceMotion) {                           // splash
+        for (let j = 0; j < 14; j++) {
+          const a = -Math.PI / 2 + (j / 13 - .5) * 1.6, v = (30 + (j * 37 % 23)) * S;
+          const px = gx + Math.cos(a) * v * since * 1.4, py = gy + Math.sin(a) * v * since * 2.2 + 60 * S * since * since;
+          if (py <= gy + 2) { g.fillStyle = `rgba(235,246,255,${1 - since / 1.6})`; g.beginPath(); g.arc(px, py, 1.8 * S, 0, 7); g.fill(); }
+        }
+        [0, .35].forEach((d) => {
+          const s2 = since - d; if (s2 <= 0) return;
+          g.strokeStyle = `rgba(255,255,255,${Math.max(0, .9 - s2 / 1.4)})`; g.lineWidth = 1.6;
+          g.beginPath(); g.ellipse(gx, gy + 3, (6 + s2 * 26) * S, (2 + s2 * 5) * S, 0, 0, 7); g.stroke();
+        });
       }
-      ctx.fillStyle = COLOURS[i]; ctx.fillRect(sx(x) - 1, gy - 24 - i * 5, 2, 24 + i * 5);
-      ctx.beginPath(); ctx.arc(sx(x), gy - 28 - i * 5, 9, 0, 7); ctx.fill();
-      ctx.fillStyle = "#fff"; ctx.font = "bold 10px system-ui"; ctx.textAlign = "center";
-      ctx.fillText("ABC"[i], sx(x), gy - 24.5 - i * 5);
+      if (f.reached || since > 0.4) Scene.drawGlider(g, gx, gy - (f.reached ? 6 : 2) * S, f.reached ? 0 : 0.12, COLOURS[i], DARK[i]);
+      g.fillStyle = COLOURS[i]; g.fillRect(gx - 1, gy - (30 + i * 6) * S, 2, (30 + i * 6) * S);
+      g.beginPath(); g.arc(gx, gy - (34 + i * 6) * S, 8.5 * S + 1, 0, 7); g.fill();
+      g.fillStyle = "#fff"; g.font = `bold ${Math.max(8, 10 * S)}px system-ui`; g.textAlign = "center";
+      g.fillText("ABC"[i], gx, gy - (30.5 + i * 6) * S);
     }
   });
   return done;
 }
 
+function drawWreckage(g, t) {
+  const sx = Scene.sx, HZ = Scene.HZ, S = Math.max(.6, Scene.S);
+  [[140, .4], [270, -.3], [360, .2], [470, -.15]].forEach(([m, r], i) => {
+    g.save(); g.translate(sx(m), HZ + 3 + Math.sin(t * 2 + i) * 3); g.rotate(r + Math.sin(t * 1.3 + i) * .1);
+    g.fillStyle = "#6e4b2a"; g.fillRect(-15 * S, -3 * S, 30 * S, 6 * S); g.fillStyle = "#8a6238"; g.fillRect(-15 * S, -3 * S, 30 * S, 2 * S);
+    g.restore();
+  });
+}
+function drawWhale(g, t) {
+  const wx = Scene.sx(560), wy = Scene.HZ + 2, S = Math.max(.6, Scene.S), lift = (Math.sin(t * .9) * .5 + .5) * 8 * S;
+  g.fillStyle = "#2f3e4c";
+  g.beginPath(); g.moveTo(wx, wy); g.quadraticCurveTo(wx - 4 * S, wy - 26 * S - lift, wx - 24 * S, wy - 36 * S - lift);
+  g.quadraticCurveTo(wx, wy - 28 * S - lift, wx + 24 * S, wy - 36 * S - lift); g.quadraticCurveTo(wx + 4 * S, wy - 26 * S - lift, wx, wy); g.fill();
+  g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 1.5;
+  g.beginPath(); g.ellipse(wx, wy + 2, 30 * S, 4 * S, 0, 0, 7); g.stroke();
+}
+
+let lastT = performance.now(), envTick = 0, introWeather = null;
 function frame(now) {
-  const t = now / 1000;
+  const t = now / 1000, dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
   if (phase === "intro") {
-    const line = INTRO[introIdx];
-    drawScene(t, !!line.storm);
-    drawLink(sx(ISLAND_X), sy(LAUNCH_H + 4), t, !line.storm);
-    if (line.bottle || line.whale) drawBottle(sx(ISLAND_X) + 16, sy(LAUNCH_H + 4) + 8);
-    if (line.whale) {                                      // a whale tail in the distance
-      const wx = sx(520), wy = SEA();
-      ctx.fillStyle = "#34495e"; ctx.beginPath(); ctx.moveTo(wx, wy); ctx.quadraticCurveTo(wx - 4, wy - 26, wx - 22, wy - 34);
-      ctx.quadraticCurveTo(wx, wy - 26, wx + 22, wy - 34); ctx.quadraticCurveTo(wx + 4, wy - 26, wx, wy); ctx.fill();
+    const want = INTRO[introIdx].storm ? "storm" : "clear";
+    if (want !== introWeather) { introWeather = want; if (want === "storm") Scene.force("storm"); else Scene.release("sunny"); }
+  } else if (introWeather === "storm") { introWeather = "clear"; Scene.release("sunny"); }
+  Scene.update(dt, now);
+  if (now - envTick > 500) { envTick = now; const el = document.getElementById("env"); if (el) el.textContent = Scene.clockLabel(); }
+
+  let banner = null;
+  Scene.render(t, now, (g) => {
+    const geo = Scene.geo, S = Scene.S, HZ = Scene.HZ, linkY = geo.islandY(geo.linkX);
+    if (phase === "intro") {
+      const line = INTRO[introIdx];
+      if (line.storm) drawWreckage(g, t);
+      Scene.drawLink(g, geo.linkX, linkY, t, !line.storm);
+      if (line.bottle || line.whale) Scene.drawBottle(g, geo.linkX + 14 * Math.max(.6, S), linkY);
+      if (line.whale) drawWhale(g, t);
+      const el = document.getElementById("introText");
+      if (el) { const n = reduceMotion ? 9999 : Math.floor((now - introStart) / 22); el.textContent = line.text.slice(0, n); }
+      return null;
     }
-    const el = document.getElementById("introText");
-    if (el) { const n = reduceMotion ? 9999 : Math.floor((now - introStart) / 22); el.textContent = line.text.slice(0, n); }
-  } else if (phase === "flying" && anim) {
-    drawScene(t, false); drawLink(sx(ISLAND_X), sy(LAUNCH_H + 4), t, true);
-    const done = drawFlights(anim.round, (now - anim.start) / 1000);
-    if (done && (now - anim.start) / 1000 > STAGGER * 2 + DURATION + 0.8) {
-      if (anim.round.flights.some(f => f.reached)) startRescue(); else { phase = "results"; renderAll(); }
-    }
-  } else if (phase === "rescue" && anim) {
-    const e = reduceMotion ? 99 : (now - anim.start) / 1000;
-    drawScene(t, false);
-    if (S.last_round) drawFlights(S.last_round, 99);
-    // 0-1.5s message delivered, 1.5-5.5 boat sails to island, 5.5-6.5 Link boards, 6.5-10.5 sail home
-    const islandX = sx(ISLAND_X + 40), homeX = sx(DOCK_X);
-    let bx, linkOnBoat = false;
-    if (e < 1.5) bx = homeX;
-    else if (e < 5.5) bx = homeX + (islandX - homeX) * ((e - 1.5) / 4);
-    else if (e < 6.5) { bx = islandX; linkOnBoat = e > 6.0; }
-    else { bx = islandX + (homeX - islandX) * Math.min(1, (e - 6.5) / 4); linkOnBoat = true; }
-    if (e >= 1.5) drawBoat(bx, SEA() - 4, t);
-    if (linkOnBoat) drawLink(bx - 4, SEA() - 18, t, true);
-    else if (e < 6.0) {
-      const lx = e > 5.5 ? sx(ISLAND_X) + (islandX - 20 - sx(ISLAND_X)) * ((e - 5.5) / 0.5) : sx(ISLAND_X);
-      drawLink(lx, sy(LAUNCH_H + 4), t, true);
-    }
-    const msg = e < 1.5 ? "📨 Message delivered!" : e < 6.5 ? "🚢 A rescue boat is on the way!" : "🎉 Link is rescued!";
-    ctx.font = "bold " + (W < 640 ? 16 : 24) + "px system-ui"; ctx.textAlign = "center";
-    const mw = ctx.measureText(msg).width + 36, my = SEA() * 0.36;
-    ctx.fillStyle = "rgba(20,110,60,.92)"; ctx.fillRect(W / 2 - mw / 2, my - 30, mw, 44);
-    ctx.fillStyle = "#fff"; ctx.fillText(msg, W / 2, my);
-    if (e > 10.8) {
-      phase = "rescued"; renderAll();
-      if (!S.rescue_seen) send("rescue_done");
-    }
-  } else {
-    drawScene(t, false);
-    if (phase === "rescued") {
-      drawBoat(sx(DOCK_X), SEA() - 4, t); drawLink(sx(DOCK_X) - 4, SEA() - 18, t, true);
-    } else {
-      drawLink(sx(ISLAND_X), sy(LAUNCH_H + 4), t, phase !== "results");
-      if (S && S.last_round && (phase === "results" || phase === "waiting" || phase === "build")) {
-        if (phase === "results") drawFlights(S.last_round, 99);
+    if (phase === "flying" && anim) {
+      Scene.drawLink(g, geo.linkX, linkY, t, true);
+      const el = (now - anim.start) / 1000, done = drawFlights(g, anim.round, el);
+      if (done && el > STAGGER * 2 + DURATION + 0.8) {
+        if (anim.round.flights.some((f) => f.reached)) startRescue(); else { phase = "results"; renderAll(); }
       }
+      return null;
     }
+    if (phase === "rescue" && anim) {
+      // 0-1.5 s message delivered, 1.5-5.5 boat sails to the island, 5.5-6.5 Link boards, 6.5-10.5 sail home
+      const e = reduceMotion ? 99 : (now - anim.start) / 1000;
+      if (window.__lastRound) drawFlights(g, window.__lastRound, 99);
+      const islandX = geo.boatIsland, homeX = Scene.sx(DOCK_M);
+      let bx, onBoat = false;
+      if (e < 1.5) bx = homeX;
+      else if (e < 5.5) bx = lerp(homeX, islandX, (e - 1.5) / 4);
+      else if (e < 6.5) { bx = islandX; onBoat = e > 6.0; }
+      else { bx = lerp(islandX, homeX, Math.min(1, (e - 6.5) / 4)); onBoat = true; }
+      const lamp = e >= 1.5 ? Scene.drawBoat(g, bx, t, onBoat) : Scene.drawBoat(g, homeX, t, false);
+      if (!onBoat) {
+        const k = e > 5.5 ? Math.min(1, (e - 5.5) / 0.5) : 0;
+        Scene.drawLink(g, lerp(geo.linkX, islandX - 24 * Math.max(.55, S), k), lerp(linkY, HZ, k), t, true);
+      }
+      banner = e < 1.5 ? "📨 Message delivered!" : e < 6.5 ? "🚢 A rescue boat is on the way!" : "🎉 Link is rescued!";
+      if (e > 10.8) { phase = "rescued"; renderAll(); if (!window.__rescueSent) { window.__rescueSent = true; send("rescue_done"); } }
+      return [lamp];
+    }
+    if (phase === "rescued") return [Scene.drawBoat(g, Scene.sx(DOCK_M), t, true)];
+    Scene.drawLink(g, geo.linkX, linkY, t, phase !== "results");
+    if (phase === "results" && window.__lastRound) drawFlights(g, window.__lastRound, 99);
+    return null;
+  });
+
+  if (banner) {
+    const c = Scene.ctx, W = Scene.W;
+    c.font = `bold ${W < 640 ? 16 : 24}px system-ui`; c.textAlign = "center";
+    const mw = c.measureText(banner).width + 40, my = Scene.HZ * 0.36;
+    c.fillStyle = "rgba(20,110,60,.9)"; c.beginPath(); c.roundRect(W / 2 - mw / 2, my - 31, mw, 46, 12); c.fill();
+    c.fillStyle = "#fff"; c.fillText(banner, W / 2, my);
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// ---------------------------------------------------------------------------
+// Music controls (bottom-right): "Now Playing" toast + mute button
+// ---------------------------------------------------------------------------
+const npEl = document.getElementById("np"), muteEl = document.getElementById("mute");
+let npTimer = null;
+function toast(text, ms) {
+  npEl.textContent = text; npEl.classList.add("show");
+  clearTimeout(npTimer); npTimer = setTimeout(() => npEl.classList.remove("show"), ms || 4500);
+}
+Music.onNowPlaying = (title) => toast("🎵 Now Playing: " + title);
+function showMute(m) { muteEl.textContent = m ? "🔇" : "🔊"; muteEl.title = m ? "Turn music on" : "Mute music"; }
+Music.onMuteChange = showMute;
+showMute(Music.muted);
+muteEl.addEventListener("pointerdown", (e) => e.stopPropagation());
+muteEl.onclick = () => Music.toggle();
+document.addEventListener("pointerdown", () => { if (!Music.muted) Music.begin(); });
+Scene.onLightning = () => Music.thunder();
+if (!Music.muted) toast("🔈 Music starts when you click in the game", 5000);
 
 // ---------------------------------------------------------------------------
 // HTML: HUD, overlays, controls panel
@@ -377,7 +349,7 @@ function renderHud() {
     const pct = Math.max(0, Math.min(100, (S.points - S.prev_threshold) / (S.next_upgrade.points - S.prev_threshold) * 100));
     bar = `<div class="bar"><i style="width:${pct}%"></i></div><small>Next: ${esc(S.next_upgrade.title)} at ${S.next_upgrade.points} ⭐</small>`;
   }
-  hud.innerHTML = `⭐ <b>${S.points}</b> pts &nbsp; 🏆 <b>${Math.round(S.best)} m</b> &nbsp; 🚀 Round ${S.rounds_flown}` + bar;
+  hud.innerHTML = `<div class="env" id="env">${Scene.clockLabel()}</div>⭐ <b>${S.points}</b> pts &nbsp; 🏆 <b>${Math.round(S.best)} m</b> &nbsp; 🚀 Round ${S.rounds_flown}` + bar;
 }
 
 function renderOverlay() {

@@ -105,7 +105,8 @@ st.info(
     "**What's real and what's game?** Each wing's **x/c** is a real prediction from WingCheck's "
     "machine-learning model. **Distance, height and points** are invented **game rules**: here, "
     "distance is proportional to x/c (1.5× the x/c flies 1.5× as far). Real wings also depend on "
-    "lift, drag, weight and much more.",
+    "lift, drag, weight and much more. **Weather, time of day and music are just atmosphere**: "
+    "the model was never given wind or rain, so they never change any prediction or result.",
     icon="🎮",
 )
 

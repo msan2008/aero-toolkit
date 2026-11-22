@@ -16,7 +16,7 @@ with left:
         st.subheader("🏝️ Wing Lab")
         st.caption("New to aerodynamics? Start here. · A game, about 15 minutes")
         st.markdown(
-            "- Help Kai send a rescue message **across the ocean**\n"
+            "- Help Link send a rescue message in a bottle **across the ocean**\n"
             "- Launch three gliders per round and watch them fly\n"
             "- Earn points to **unlock upgrades**, up to a whale-inspired wing\n"
             "- Learn about **biomimicry** and **flow separation** along the way"

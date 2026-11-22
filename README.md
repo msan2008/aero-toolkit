@@ -37,10 +37,16 @@ In depth instructions can be found in Streamlit's guides.
 The web application is run through Streamlit and is deployed from app/app.py.
 
 ## Files Needed for App Integration
-app/app.py
+app/app.py (entrypoint and page router: Home, Wing Lab, Advanced Mode)
+app/home.py
+app/wing_lab.py
+app/wing_lab_core.py
+app/advanced_mode.py
 src/inference.py
 models/themodelname
 requirements.txt
+
+Run tests (optional, needs pytest): `python -m pytest tests -q`
 
 ## Workshop Materials
 The workshops are meant to teach how to use the web application and interact with the model as well as collecting feedback. Through slides, worksheets, and a feedback form, I am able to teach students, scientists, engineers, etc. how to use this model for their own needs but also learn on how I can improve it further. Workshop resources can be found in the repository's workshop folder.

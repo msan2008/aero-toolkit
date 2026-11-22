@@ -56,7 +56,6 @@ state = ss.wl_state
 def frontend_state(s: dict) -> dict:
     """Everything the game frontend needs to draw. JSON-serialisable."""
     unlocks = game.unlocked(s["points"])
-    nxt = game.next_upgrade(s["points"])
     last = None
     if s["rounds"]:
         r = s["rounds"][-1]
@@ -75,8 +74,6 @@ def frontend_state(s: dict) -> dict:
         "won": s["won"], "intro_seen": s["intro_seen"], "rescue_seen": s["rescue_seen"],
         "unlocks": sorted(unlocks),
         "upgrades": [{k: u[k] for k in ("key", "points", "title", "text")} for u in game.UPGRADES],
-        "next_upgrade": {"title": nxt["title"], "points": nxt["points"]} if nxt else None,
-        "prev_threshold": max([0] + [u["points"] for u in game.UPGRADES if u["points"] <= s["points"]]),
         "config": s["config"], "scout": s["scout"], "error": s["error"],
         "starters": [{"name": x["name"], "family": x["airfoil_family"], "angle": x["angle_of_attack"]}
                      for x in game.STARTER_SLOTS],

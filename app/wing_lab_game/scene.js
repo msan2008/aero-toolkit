@@ -26,7 +26,7 @@
   // ---------------------------------------------------------------- world geometry
   const X0 = -150, X1 = 1180, YMAX = 240;
   const LAUNCH_H = 22, LAND_H = 14, DOCK_M = 955, MAINLAND_M = 1000;
-  let W = 800, H = 460, DPR = 1, HZ = 300, S = 1;            // S = art scale
+  let W = 800, H = 460, SH = 460, DPR = 1, HZ = 300, S = 1;   // H = canvas height, SH = scene height above the controls, S = art scale
   const sx = (m) => (m - X0) / (X1 - X0) * W;
   const sy = (m) => HZ - m / YMAX * (HZ - 46);
 
@@ -273,9 +273,9 @@
     });
   }
 
-  function resize() {
+  function resize(totalH) {
     DPR = window.devicePixelRatio || 1;
-    W = cv.clientWidth || 800; H = W < 640 ? 400 : 460; HZ = Math.round(H * 0.64);
+    W = cv.clientWidth || 800; SH = W < 640 ? 400 : 460; H = Math.max(SH, Math.ceil(totalH || 0)); HZ = Math.round(SH * 0.64);
     S = clamp(W / 1400, 0.42, 1.15);
     cv.style.height = H + "px";
     for (const c of [cv, wc]) { c.width = W * DPR; c.height = H * DPR; }
@@ -517,10 +517,10 @@
   let whale = null, nextWhale = performance.now() + 9000;
   function drawWhales(g, t, now) {
     if (!whale && now > nextWhale) {
-      whale = { t0: now, x: sx(180 + Math.random() * 600), y: HZ + (H - HZ) * (.32 + Math.random() * .25), dir: Math.random() < .5 ? -1 : 1 };
+      whale = { t0: now, x: sx(180 + Math.random() * 600), y: HZ + (SH - HZ) * (.32 + Math.random() * .25), dir: Math.random() < .5 ? -1 : 1 };
     }
     if (!whale) return;
-    const e = (now - whale.t0) / 1000, k = (whale.y - HZ) / (H - HZ), s = Math.max(.6, S) * (.8 + k * .8);
+    const e = (now - whale.t0) / 1000, k = (whale.y - HZ) / (SH - HZ), s = Math.max(.6, S) * (.8 + k * .8);
     const x = whale.x + whale.dir * e * 6 * s, y = whale.y;
     if (e > 10) { whale = null; nextWhale = now + 16000 + Math.random() * 16000; return; }
     const body = "#2b4a63", belly = "#5d7d96";
@@ -711,7 +711,7 @@
     release(next) { forced = null; setWeather(next || "sunny", false); },
     set onLightning(fn) { onLightning = fn; },
     _testSetPhase(p) { phaseOverride = p; },
-    sx, sy, get W() { return W; }, get H() { return H; }, get HZ() { return HZ; }, get S() { return S; },
+    sx, sy, get W() { return W; }, get H() { return H; }, get SH() { return SH; }, get HZ() { return HZ; }, get S() { return S; },
     geo, LAUNCH_H, LAND_H, ctx,
     drawLink, drawGlider, drawBoat, drawBottle,
   };

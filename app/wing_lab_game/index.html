@@ -19,9 +19,12 @@
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; background:var(--panel); color:var(--ink);
                font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  #game { border-radius:12px; overflow:hidden; background:var(--panel); }
-  #stage { position:relative; }
-  canvas { display:block; width:100%; }
+  #game { position:relative; border-radius:12px; overflow:hidden; background:var(--panel); }
+  #stage { position:relative; z-index:1; }
+  canvas { display:block; width:100%; position:absolute; left:0; top:0; z-index:0; }
+  #panel, #footer { position:relative; z-index:1; }
+  #controls { position:relative; z-index:1; background:rgba(12,36,58,.42); border-top:1px solid rgba(255,255,255,.18);
+              backdrop-filter:blur(9px) saturate(1.15); -webkit-backdrop-filter:blur(9px) saturate(1.15); }
   .pill { position:absolute; padding:4px 10px; border-radius:999px; background:rgba(10,30,50,.42); backdrop-filter:blur(5px);
           color:#fff; font-size:12px; }
   #tag { left:10px; top:10px; max-width:calc(100% - 250px); }
@@ -59,8 +62,9 @@
   button.seg.on { background:var(--gold); color:#1b1b1b; border-color:var(--gold); font-weight:700; }
   #panel { padding:10px 12px 12px; }
   .strip { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-  .badge { font-size:12px; padding:3px 8px; border-radius:999px; background:#0b2234; color:var(--muted); }
-  .badge.on { background:#1f6b4d; color:#fff; }
+  .badge { font-size:12px; padding:3px 9px; border-radius:999px; background:rgba(31,140,90,.55); color:#fff;
+           border:1px solid rgba(255,255,255,.2); }
+  .badge.hint { background:rgba(255,255,255,.12); color:#e3eef6; }
   .controls { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-bottom:8px; }
   .controls label { font-size:14px; }
   .lock { color:var(--muted); font-size:13px; }
@@ -72,11 +76,12 @@
     #hud { font-size:12px; padding:4px 8px; }
     .card-ov { font-size:12px; padding:10px 12px; } .card-ov h3 { font-size:16px; } .big { font-size:15px; }
     .dialog { font-size:14px; }
+    #footer { flex-wrap:wrap; } #envnote { flex-basis:100%; }
   }
-  .wing { background:var(--card); border-radius:10px; padding:8px 10px; border-left:6px solid #999; font-size:13px; }
+  .wing { background:rgba(20,60,92,.5); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px; border-left:6px solid #999; font-size:13px; }
   .wing .t { font-weight:700; font-size:14px; margin-bottom:4px; }
   select, input[type=range] { width:100%; }
-  select { background:var(--card2); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:6px; padding:4px; font:inherit; }
+  select { background:rgba(29,75,108,.7); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:6px; padding:4px; font:inherit; }
   input[type=range] { accent-color: var(--gold); }
   .scout { margin-top:4px; color:var(--gold); font-weight:700; }
   #launch { width:100%; margin-top:10px; padding:10px; font-size:17px; }
@@ -91,15 +96,17 @@
 </head>
 <body>
 <div id="game">
+  <canvas id="c"></canvas>
   <div id="stage">
-    <canvas id="c"></canvas>
     <span id="tag" class="pill"><span class="long">🎮 Game animation: conceptual, not a flow simulation</span><span class="short">🎮 Conceptual game animation</span></span>
     <div id="hud" class="pill"></div>
     <div id="overlay"></div>
   </div>
+  <div id="controls">
   <div id="panel"></div>
   <div id="footer"><span id="envnote">🌦️ Weather and time of day are just scenery. They never change predictions, distances or points.</span>
     <span class="grow"></span><span id="np"></span><button id="mute" aria-label="Mute music">🔊</button></div>
+  </div>
 </div>
 
 <script src="scene.js"></script>
@@ -170,8 +177,14 @@ function onState(s) {
 const LAUNCH_H = Scene.LAUNCH_H, LAND_H = Scene.LAND_H, DOCK_M = 955;
 const DARK = ["#c2551b", "#a3243a", "#6c3a9e"];
 const lerp = (a, b, t) => a + (b - a) * t;
-function resize() { Scene.resize(); }
+const gameEl = document.getElementById("game"), stageEl = document.getElementById("stage");
+let lastGameH = 0;
+function resize() {
+  Scene.resize(gameEl.offsetHeight);
+  stageEl.style.height = Scene.SH + "px";
+}
 window.addEventListener("resize", () => { resize(); fitHeight(); });
+new ResizeObserver(() => { if (Math.abs(gameEl.offsetHeight - lastGameH) > 1) { lastGameH = gameEl.offsetHeight; resize(); } }).observe(gameEl);
 resize();
 
 // ---------------------------------------------------------------------------
@@ -354,12 +367,7 @@ function renderHud() {
   const hud = document.getElementById("hud");
   if (!S || phase === "intro") { hud.classList.add("hidden"); return; }
   hud.classList.remove("hidden");
-  let bar = "<br><small>All upgrades unlocked!</small>";
-  if (S.next_upgrade) {
-    const pct = Math.max(0, Math.min(100, (S.points - S.prev_threshold) / (S.next_upgrade.points - S.prev_threshold) * 100));
-    bar = `<div class="bar"><i style="width:${pct}%"></i></div><small>Next: ${esc(S.next_upgrade.title)} at ${S.next_upgrade.points} ⭐</small>`;
-  }
-  hud.innerHTML = `<div class="env" id="env">${Scene.clockLabel()}</div>⭐ <b>${S.points}</b> pts &nbsp; 🏆 <b>${Math.round(S.best)} m</b> &nbsp; 🚀 Round ${S.rounds_flown}` + bar;
+  hud.innerHTML = `<div class="env" id="env">${Scene.clockLabel()}</div>⭐ <b>${S.points}</b> pts &nbsp; 🏆 <b>${Math.round(S.best)} m</b> &nbsp; 🚀 Round ${S.rounds_flown}`;
 }
 
 function renderOverlay() {
@@ -416,7 +424,10 @@ function renderPanel() {
     panel.innerHTML = `<div class="muted" style="padding:6px 2px">🎉 Workshop closed: Link is going home!</div>`; return;
   }
   const busy = phase !== "build";
-  const strip = S.upgrades.map(u => `<span class="badge ${has(u.key) ? "on" : ""}">${has(u.key) ? "✓" : "🔒"} ${esc(u.title)}${has(u.key) ? "" : " · " + u.points + "⭐"}</span>`).join("");
+  const earned = S.upgrades.filter((u) => has(u.key));
+  const strip = earned.length
+    ? earned.map((u) => `<span class="badge">✓ ${esc(u.title)} · earned at ${u.points}⭐</span>`).join("")
+    : `<span class="badge hint">🧰 Beat your record to earn upgrades for the workshop!</span>`;
   const angle = has("angle")
     ? `<label>📐 Launch angle <b id="angVal">${cfg.angle}°</b><br><input id="ang" type="range" min="0" max="24" step="1" value="${cfg.angle}" ${busy ? "disabled" : ""}></label>`
     : "";

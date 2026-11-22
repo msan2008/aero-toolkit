@@ -13,15 +13,15 @@ left, right = st.columns(2, gap="large")
 
 with left:
     with st.container(border=True):
-        st.subheader("🐋 Wing Lab")
-        st.caption("New to aerodynamics? Start here. · About 10 minutes")
+        st.subheader("🏝️ Wing Lab")
+        st.caption("New to aerodynamics? Start here. · A game, about 15 minutes")
         st.markdown(
-            "- Learn what **biomimicry** and **flow separation** mean\n"
-            "- Tune a whale-inspired wing in one guided challenge\n"
-            "- Get **3 attempts** to beat the starting design\n"
-            "- Answer a final question and download your results"
+            "- Help Kai send a rescue message **across the ocean**\n"
+            "- Launch three gliders per round and watch them fly\n"
+            "- Earn points to **unlock upgrades**, up to a whale-inspired wing\n"
+            "- Learn about **biomimicry** and **flow separation** along the way"
         )
-        st.page_link("wing_lab.py", label="Start the Wing Lab challenge", icon="▶️")
+        st.page_link("wing_lab.py", label="Play Wing Lab", icon="▶️")
 
 with right:
     with st.container(border=True):

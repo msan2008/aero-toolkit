@@ -34,12 +34,15 @@
              pointer-events:none; }
   #overlay > div { pointer-events:auto; }
   .hidden { display:none !important; }
-  .dialog { position:absolute; left:4%; right:4%; bottom:5%; background:rgba(10,28,44,.92);
+  .dialog { background:rgba(10,28,44,.92); min-height:120px;
             border:2px solid var(--gold); border-radius:12px; padding:12px 16px; font-size:16px; line-height:1.45; }
   .dialog .who { color:var(--gold); font-weight:700; margin-bottom:4px; }
   .dialog .btns { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
   .card-ov { background:rgba(10,28,44,.94); border:2px solid var(--gold); border-radius:14px;
-             padding:14px 18px; width:min(560px, 92%); max-height:92%; overflow:auto; font-size:14px; }
+             padding:14px 18px; width:min(560px, 92%); max-height:calc(100% - 10px); font-size:14px;
+             display:flex; flex-direction:column; }
+  .card-ov .body { overflow:auto; min-height:0; }
+  .card-ov .foot { flex:0 0 auto; text-align:right; padding-top:10px; }
   .card-ov h3 { margin:0 0 8px; font-size:20px; }
   .row { display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,.08); }
   .dot { width:12px; height:12px; border-radius:50%; flex:0 0 auto; }
@@ -379,18 +382,7 @@ function renderHud() {
 
 function renderOverlay() {
   const ov = document.getElementById("overlay");
-  if (phase === "intro") {
-    const last = introIdx === INTRO.length - 1;
-    ov.innerHTML = `<div class="dialog"><div class="who">🧍 Link</div><div id="introText"></div>
-      <div class="btns"><button id="skip">Skip intro</button>
-      <button class="primary" id="next">${last ? "Let's build! 🛠️" : "Next ▶"}</button></div></div>`;
-    document.getElementById("next").onclick = () => {
-      if (introIdx < INTRO.length - 1) { introIdx++; introStart = performance.now(); renderOverlay(); }
-      else finishIntro();
-    };
-    document.getElementById("skip").onclick = finishIntro;
-    return;
-  }
+  if (phase === "intro") { ov.innerHTML = ""; return; }   // the intro dialog is drawn in the panel
   if (phase === "results" && S.last_round) {
     const r = S.last_round;
     const rows = r.flights.map((f, i) => `<div class="row"><span class="dot" style="background:${COLOURS[i]}"></span>
@@ -402,11 +394,11 @@ function renderOverlay() {
       : `<div class="big" style="margin-top:8px">No new record, so no points this round.</div>
          <div class="muted">Try changing one thing at a time to see what helps.</div>`;
     const unl = r.new_unlocks.map(u => `<div style="margin-top:6px">🔓 <b>${esc(u.title)}</b>: ${esc(u.text)}</div>`).join("");
-    ov.innerHTML = `<div class="card-ov"><h3>Round ${r.round} results</h3>${rows}${pts}
+    ov.innerHTML = `<div class="card-ov"><h3>Round ${r.round} results</h3><div class="body">${rows}${pts}
       <div style="margin-top:4px">Total: <b class="gold">${S.points} ⭐</b> &nbsp; Record: <b>${Math.round(S.best)} m</b></div>${unl}
-      <div class="muted" style="margin-top:8px">x/c = real model prediction · distance and points = game rules</div>
-      <div style="text-align:right;margin-top:10px"><button class="primary" id="nextRound">🛠️ Build next round</button></div></div>`;
-    document.getElementById("nextRound").onclick = () => { phase = "build"; renderAll(); };
+      <div class="muted" style="margin-top:8px">x/c = real model prediction · distance and points = game rules</div></div>
+      <div class="foot"><button class="primary" id="nextRound">🛠️ Build next round</button></div></div>`;
+    document.getElementById("nextRound").onclick = toBuild;
     return;
   }
   if (phase === "rescued") {
@@ -421,10 +413,23 @@ function renderOverlay() {
 }
 
 function finishIntro() { phase = "build"; renderAll(); send("intro_done"); }
+function toBuild() { phase = "build"; renderAll(); }
 
 function renderPanel() {
   const panel = document.getElementById("panel");
-  if (!S || phase === "intro" || phase === "loading") { panel.innerHTML = ""; return; }
+  if (!S || phase === "loading") { panel.innerHTML = ""; return; }
+  if (phase === "intro") {
+    const last = introIdx === INTRO.length - 1;
+    panel.innerHTML = `<div class="dialog"><div class="who">🧍 Link</div><div id="introText"></div>
+      <div class="btns"><button id="skip">Skip intro</button>
+      <button class="primary" id="next">${last ? "Let's build! 🛠️" : "Next ▶"}</button></div></div>`;
+    document.getElementById("next").onclick = () => {
+      if (introIdx < INTRO.length - 1) { introIdx++; introStart = performance.now(); renderPanel(); }
+      else finishIntro();
+    };
+    document.getElementById("skip").onclick = finishIntro;
+    return;
+  }
   if (phase === "rescue" || phase === "rescued") {
     panel.innerHTML = `<div class="muted" style="padding:6px 2px">🎉 Workshop closed: Link is going home!</div>`; return;
   }
@@ -457,12 +462,12 @@ function renderPanel() {
     return `<div class="wing" style="border-left-color:${COLOURS[i]}"><div class="t">Wing ${"ABC"[i]} · ${esc(st.name)}</div>
       ${famCtl}${bump}<div class="muted" style="margin-top:4px">${ang}° · ${has("speed") ? cfg.speed : S.speeds[0]} m/s</div>${scout}</div>`;
   }).join("");
-  const label = phase === "waiting" ? "⏳ Launching..." : phase === "flying" ? "✈️ Flying..." : phase === "results" ? "📋 See the results above" : "🚀 Launch!";
+  const label = phase === "waiting" ? "⏳ Launching..." : phase === "flying" ? "✈️ Flying..." : phase === "results" ? "🛠️ Build next round" : "🚀 Launch!";
   panel.innerHTML = `<div class="strip">${strip}</div>
     ${angle || speed || scoutBtn ? `<div class="controls">${angle}${speed}${scoutBtn}</div>` : ""}
     ${has("bump_height") ? '<div class="muted" style="margin-bottom:6px">In the CFD data, bump height and spacing always changed together, so the six real designs are offered as pairs.</div>' : ""}
     <div class="cards">${cards}</div>
-    <button id="launch" class="primary" ${busy ? "disabled" : ""}>${label}</button>
+    <button id="launch" class="primary" ${busy && phase !== "results" ? "disabled" : ""}>${label}</button>
     ${S.error ? `<div class="err">⚠️ ${esc(S.error)}</div>` : ""}`;
 
   const q = (sel) => panel.querySelector(sel);
@@ -475,7 +480,7 @@ function renderPanel() {
     r.onchange = () => renderPanel();
   });
   if (q("#scout")) q("#scout").onclick = () => send("scout", { config: cfg });
-  q("#launch").onclick = () => { phase = "waiting"; waitingSince = performance.now(); renderPanel(); send("launch", { config: cfg }); };
+  q("#launch").onclick = () => { if (phase === "results") return toBuild(); phase = "waiting"; waitingSince = performance.now(); renderPanel(); send("launch", { config: cfg }); };
 }
 
 post("streamlit:componentReady", { apiVersion: 1 });

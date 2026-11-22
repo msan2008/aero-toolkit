@@ -104,6 +104,24 @@
     }
   }
 
+  function mood() {                              // used by the music: morning / day / night
+    if (env.dark > 0.45) return "night";
+    return env.phase < 0.42 ? "morning" : "day";
+  }
+
+  // where the light comes from (sun by day, moon by night) and how strong it is
+  function light() {
+    if (env.sunElev > 0) return { x: env.sun[0], k: Math.min(1, env.sunElev * 3) * (1 - wx_now.cloud * .75), warm: true };
+    if (env.moonElev > 0) return { x: env.moon[0], k: Math.min(1, env.moonElev * 3) * .45 * (1 - wx_now.cloud * .8), warm: false };
+    return { x: W / 2, k: 0, warm: false };
+  }
+  function shadow(g, x, y, w, h) {              // soft shadow cast away from the light
+    const L = light(); if (L.k < .03) return;
+    const dx = clamp((x - L.x) / W, -1, 1) * 26 * Math.max(.5, S);
+    g.fillStyle = `rgba(30,20,10,${.28 * L.k})`;
+    g.beginPath(); g.ellipse(x + dx, y, w + Math.abs(dx) * .6, h, 0, 0, 7); g.fill();
+  }
+
   function clockLabel() {
     const mins = Math.floor(env.phase * 24 * 60), h = Math.floor(mins / 60), m = mins % 60;
     const w = WEATHER[wxTarget], night = env.dark > 0.5;
@@ -168,14 +186,14 @@
     geo.boatIsland = cx + rx + 36 * S;
     L.island = canvasLayer(W, H, (g) => {
       let gr = g.createRadialGradient(cx, base, rx * .3, cx, base, rx * 1.45);
-      gr.addColorStop(0, "rgba(120,230,220,.75)"); gr.addColorStop(1, "rgba(120,230,220,0)");
+      gr.addColorStop(0, "rgba(80,240,220,.85)"); gr.addColorStop(1, "rgba(80,240,220,0)");
       g.fillStyle = gr; g.beginPath(); g.ellipse(cx, base + 6 * S, rx * 1.35, ry * .9, 0, 0, 7); g.fill();
       g.strokeStyle = "rgba(255,255,255,.85)"; g.lineWidth = 2.5;
       g.beginPath(); g.ellipse(cx, base + 1, rx * 1.02, ry * .35, 0, .02 * Math.PI, .98 * Math.PI); g.stroke();
       g.strokeStyle = "rgba(255,255,255,.4)"; g.lineWidth = 1.6;
       g.beginPath(); g.ellipse(cx, base + 5 * S, rx * 1.1, ry * .55, 0, .05 * Math.PI, .95 * Math.PI); g.stroke();
       gr = g.createLinearGradient(0, base - ry, 0, base + 6);
-      gr.addColorStop(0, "#fbe8b4"); gr.addColorStop(.7, "#e8c983"); gr.addColorStop(1, "#c9a45f");
+      gr.addColorStop(0, "#fff0bf"); gr.addColorStop(.7, "#f5cf7f"); gr.addColorStop(1, "#d6a656");
       g.fillStyle = gr; g.beginPath(); g.ellipse(cx, base, rx, ry, 0, Math.PI, 0); g.fill();
       g.fillStyle = "#b9955a"; g.beginPath(); g.ellipse(cx, base, rx, 4 * S + 2, 0, 0, Math.PI); g.fill();
       [[cx - rx * .85, 20, 12], [cx + rx * .78, 24, 14], [cx + rx * .9, 13, 8]].forEach(([x, w, h]) => {
@@ -220,8 +238,8 @@
         pts.forEach(([x, y], i) => i ? g.quadraticCurveTo((pts[i - 1][0] + x) / 2, Math.min(pts[i - 1][1], y) - 12 * S, x, y) : g.lineTo(x, y));
         g.lineTo(W, HZ + 30); g.fill();
       };
-      hill([[beachX + 30 * S, beachY], [sx(1070), HZ - 70 * S], [sx(1120), HZ - 88 * S], [W, HZ - 96 * S]], "#4e8f4a", "#2f6a3b");
-      hill([[beachX + 10 * S, beachY + 2], [sx(1050), HZ - 40 * S], [sx(1110), HZ - 52 * S], [W, HZ - 58 * S]], "#78b860", "#3f7d43");
+      hill([[beachX + 30 * S, beachY], [sx(1070), HZ - 70 * S], [sx(1120), HZ - 88 * S], [W, HZ - 96 * S]], "#3fa34d", "#1f6b34");
+      hill([[beachX + 10 * S, beachY + 2], [sx(1050), HZ - 40 * S], [sx(1110), HZ - 52 * S], [W, HZ - 58 * S]], "#7fd45a", "#2f8a3c");
       g.fillStyle = "#e9d39c"; g.beginPath(); g.moveTo(beachX - 20 * S, HZ + 3); g.quadraticCurveTo(beachX, beachY, beachX + 40 * S, beachY);
       g.lineTo(W, beachY - 2); g.lineTo(W, HZ + 30); g.lineTo(beachX - 20 * S, HZ + 30); g.fill();
       g.strokeStyle = "rgba(255,255,255,.8)"; g.lineWidth = 2;
@@ -267,7 +285,7 @@
 
   // ---------------------------------------------------------------- dynamic art
   const SKY = {
-    day: ["#2a7fc4", "#69b6e8", "#f3ead8"].map(hex), dusk: ["#34497e", "#c7716f", "#ffb36b"].map(hex),
+    day: ["#1565d8", "#3fa9f5", "#ffe7bd"].map(hex), dusk: ["#2e3f8f", "#d9607a", "#ffa94d"].map(hex),
     night: ["#050a1c", "#0c1734", "#1e3156"].map(hex), storm: ["#3d4752", "#58636f", "#7d8a96"].map(hex),
   };
   function drawSky(g, t) {
@@ -321,7 +339,7 @@
 
   function drawSea(g, t) {
     const gr = g.createLinearGradient(0, HZ, 0, H);
-    const calm = [["#9fd3df", "#4aa6c4", "#1e6f9c", "#0d4a72"], ["#8aa4ad", "#4f7486", "#2c4e63", "#1a3446"]];
+    const calm = [["#8ef0ee", "#1fc0d8", "#0a84c6", "#05468f"], ["#8aa4ad", "#4f7486", "#2c4e63", "#1a3446"]];
     const st = wx_now.cloud * .8;
     [0, .15, .55, 1].forEach((p, i) => gr.addColorStop(p, rgb(mixc(hex(calm[0][i]), hex(calm[1][i]), st))));
     g.fillStyle = gr; g.fillRect(0, HZ, W, H - HZ);
@@ -344,6 +362,7 @@
   }
 
   function drawPalm(g, bx, h, lean, t) {
+    shadow(g, bx + 10 * S, geo.islandY(bx) + 2, 34 * S, 5 * S);
     const by = geo.islandY(bx), sway = Math.sin(t * (0.8 + wx_now.wind * 2.5)) * (0.02 + wx_now.wind * .06);
     const segs = 11, top = [bx + (lean + sway) * h, by - h];
     for (let i = 0; i < segs; i++) {
@@ -373,26 +392,55 @@
   }
 
   // Link: castaway in a green hoodie (hood up), tan shorts, waving
-  function drawLink(g, px, py, t, waving, s0) {
+  function drawLink(g, px, py, t, mood, s0) {
+    if (mood === true) mood = "wave"; if (!mood) mood = "idle";
     const s = (s0 || 1) * Math.max(.55, S) * 1.05;
-    g.save(); g.translate(px, py); g.scale(s, s);
-    g.fillStyle = "rgba(60,40,10,.3)"; g.beginPath(); g.ellipse(0, 0, 12, 3, 0, 0, 7); g.fill();
+    shadow(g, px, py, 11 * s, 2.6 * s);
+    const hop = mood === "excited" ? -Math.abs(Math.sin(t * 9)) * 8 : 0, slump = mood === "sad" ? 2.5 : 0;
+    g.save(); g.translate(px, py + (hop + slump) * s); g.scale(s, s);
     g.fillStyle = "#c68e5e"; g.beginPath(); g.roundRect(-6, -17, 5, 17, 2); g.fill(); g.beginPath(); g.roundRect(1, -17, 5, 17, 2); g.fill();
     g.fillStyle = "#c8a46a"; g.beginPath(); g.roundRect(-7, -25, 14, 10, 3); g.fill();                       // shorts
     const sg = g.createLinearGradient(-8, -46, 8, -22); sg.addColorStop(0, "#43a047"); sg.addColorStop(1, "#1b5e20");
     g.fillStyle = sg; g.beginPath(); g.roundRect(-8.5, -45, 17, 22, 5); g.fill();                              // hoodie body
     g.fillStyle = "#2e7d32"; g.fillRect(-5, -31, 10, 5);                                                       // front pocket
     g.strokeStyle = "#2e7d32"; g.lineWidth = 4.2; g.lineCap = "round";
-    g.beginPath(); g.moveTo(-7, -41); g.lineTo(-12, -28); g.stroke();                                          // sleeves
-    const a = waving ? -1.25 + Math.sin(t * 7) * .45 : .9;
-    g.beginPath(); g.moveTo(7, -41); g.lineTo(7 + Math.cos(a) * 11, -41 + Math.sin(a) * 11); g.stroke();
-    g.fillStyle = "#d9a06e"; g.beginPath(); g.arc(7 + Math.cos(a) * 12.5, -41 + Math.sin(a) * 12.5, 2.4, 0, 7); g.fill(); // hand
-    const hg = g.createRadialGradient(-2, -58, 2, 0, -53, 12); hg.addColorStop(0, "#4caf50"); hg.addColorStop(1, "#1b5e20");
+    const arm = (sx0, ang) => {                                                                                 // sleeve + hand
+      const ex = sx0 + Math.cos(ang) * 11, ey = -41 + Math.sin(ang) * 11;
+      g.beginPath(); g.moveTo(sx0, -41); g.lineTo(ex, ey); g.stroke();
+      g.fillStyle = "#d9a06e"; g.beginPath(); g.arc(sx0 + Math.cos(ang) * 12.5, -41 + Math.sin(ang) * 12.5, 2.4, 0, 7); g.fill();
+    };
+    if (mood === "excited") { const w = Math.sin(t * 14) * .25; arm(-7, -2.0 + w); arm(7, -1.15 - w); }      // both arms up, cheering
+    else if (mood === "sad") { arm(-6, 1.75); arm(6, 1.4); }                                                    // arms hanging
+    else if (mood === "wave") { arm(-7, 2.0); arm(7, -1.25 + Math.sin(t * 7) * .45); }
+    else { arm(-7, 2.0); arm(7, 1.1); }
+    g.save();
+    if (mood === "sad") { g.translate(0, -44); g.rotate(.32); g.translate(0, 47); }                             // head hangs down
+    const hg = g.createRadialGradient(-2, -58, 2, 0, -53, 12); hg.addColorStop(0, "#5cc760"); hg.addColorStop(1, "#1b5e20");
     g.fillStyle = hg; g.beginPath(); g.ellipse(0, -53, 10.5, 11.5, 0, 0, 7); g.fill();                         // rounded hood
-    g.fillStyle = "#d9a06e"; g.beginPath(); g.ellipse(1.5, -52, 6.5, 7.5, 0, 0, 7); g.fill();                  // face
+    g.fillStyle = "#e3aa76"; g.beginPath(); g.ellipse(1.5, -52, 6.5, 7.5, 0, 0, 7); g.fill();                  // face
     g.fillStyle = "#3b2a1a"; g.beginPath(); g.ellipse(1.5, -58, 6.5, 2.6, 0, 0, 7); g.fill();                   // fringe
-    g.fillStyle = "#222"; g.beginPath(); g.arc(4.5, -52, 1.1, 0, 7); g.fill();
+    g.strokeStyle = "#222"; g.fillStyle = "#222"; g.lineWidth = 1.1;
+    if (mood === "sad") {
+      g.beginPath(); g.moveTo(3, -52.5); g.lineTo(6, -51.5); g.stroke();                                       // closed eye
+      g.beginPath(); g.arc(4.5, -46.5, 2.2, 1.15 * Math.PI, 1.85 * Math.PI); g.stroke();                       // frown
+      g.fillStyle = "rgba(120,190,255,.9)"; g.beginPath(); g.ellipse(6.2, -49 + (t * 6 % 4), 1, 1.6, 0, 0, 7); g.fill(); // tear
+    } else {
+      g.beginPath(); g.arc(4.5, -52, 1.1, 0, 7); g.fill();
+      if (mood === "excited") { g.fillStyle = "#7a2b2b"; g.beginPath(); g.ellipse(4.5, -47.5, 2, 1.6, 0, 0, 7); g.fill(); }
+      else { g.beginPath(); g.arc(4.2, -49, 2, .15 * Math.PI, .85 * Math.PI); g.stroke(); }
+    }
     g.restore();
+    g.restore();
+  }
+
+  function drawBubble(g, x, y, text) {
+    const s = Math.max(.7, S);
+    g.font = `bold ${Math.round(13 * s)}px system-ui`; g.textAlign = "center";
+    const w = g.measureText(text).width + 18 * s, h = 24 * s, bx = clamp(x, w / 2 + 4, W - w / 2 - 4);
+    g.fillStyle = "rgba(255,255,255,.92)"; g.strokeStyle = "rgba(20,40,60,.5)"; g.lineWidth = 1;
+    g.beginPath(); g.roundRect(bx - w / 2, y - h, w, h, 10 * s); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(x - 6 * s, y - 1); g.lineTo(x - 10 * s, y + 9 * s); g.lineTo(x + 3 * s, y - 1); g.fill();
+    g.fillStyle = "#13324a"; g.fillText(text, bx, y - 7.5 * s);
   }
 
   function drawBottle(g, x, y, s0) {
@@ -445,6 +493,64 @@
       g.fillStyle = "rgba(10,25,40,.72)"; g.beginPath(); g.roundRect(bx - 18 * s, by - 35 * s, 36 * s, 14 * s, 4); g.fill();
       g.fillStyle = "#fff"; g.font = `bold ${Math.max(8, 9.5 * s)}px system-ui`; g.textAlign = "center"; g.fillText(m + " m", bx, by - 24.5 * s);
     });
+  }
+
+  // seagulls: three loose flocks drifting with the wind, flapping
+  const FLOCKS = [{ x: .1, y: .2, n: 4, sp: 1 }, { x: .55, y: .12, n: 3, sp: .8 }, { x: .8, y: .3, n: 5, sp: 1.2 }];
+  function drawBirds(g, t) {
+    const vis = (1 - env.dark) * (1 - wx_now.storm * .8) * (1 - wx_now.fog * .6); if (vis < .05) return;
+    const s = Math.max(.6, S);
+    g.strokeStyle = `rgba(35,45,60,${.85 * vis})`; g.lineCap = "round"; g.lineJoin = "round";
+    FLOCKS.forEach((f, fi) => {
+      const span = W + 200, fx = ((f.x * span + t * (14 + wx_now.wind * 30) * f.sp) % span) - 100, fy = f.y * HZ + Math.sin(t * .5 + fi) * 10;
+      for (let i = 0; i < f.n; i++) {
+        const x = fx - i * 22 * s - (i % 2) * 8 * s, y = fy + i * 7 * s * (i % 2 ? 1 : -.6) + Math.sin(t * 1.3 + i) * 3;
+        const flap = Math.sin(t * 7 + i * 1.7 + fi), w = 8 * s, up = flap * 4.5 * s;
+        g.lineWidth = 1.8 * s;
+        g.beginPath(); g.moveTo(x - w, y - up); g.quadraticCurveTo(x - w / 2, y - up * .2 - 3 * s, x, y);
+        g.quadraticCurveTo(x + w / 2, y - up * .2 - 3 * s, x + w, y - up); g.stroke();
+      }
+    });
+  }
+
+  // humpback whales: surface, blow a spout, show the back, then the tail fluke as they dive
+  let whale = null, nextWhale = performance.now() + 9000;
+  function drawWhales(g, t, now) {
+    if (!whale && now > nextWhale) {
+      whale = { t0: now, x: sx(180 + Math.random() * 600), y: HZ + (H - HZ) * (.32 + Math.random() * .25), dir: Math.random() < .5 ? -1 : 1 };
+    }
+    if (!whale) return;
+    const e = (now - whale.t0) / 1000, k = (whale.y - HZ) / (H - HZ), s = Math.max(.6, S) * (.8 + k * .8);
+    const x = whale.x + whale.dir * e * 6 * s, y = whale.y;
+    if (e > 10) { whale = null; nextWhale = now + 16000 + Math.random() * 16000; return; }
+    const body = "#2b4a63", belly = "#5d7d96";
+    g.save(); g.beginPath(); g.rect(0, 0, W, y); g.clip();                     // only the part above water shows
+    if (e < 6) {                                                               // back and dorsal hump
+      const rise = Math.sin(Math.min(1, e / 6) * Math.PI) * 14 * s;
+      const bg = g.createLinearGradient(0, y - rise, 0, y); bg.addColorStop(0, belly); bg.addColorStop(1, body);
+      g.fillStyle = bg; g.beginPath(); g.ellipse(x, y + 16 * s - rise, 62 * s, 18 * s, 0, 0, 7); g.fill();
+      g.fillStyle = body; g.beginPath(); g.moveTo(x + whale.dir * 18 * s, y - rise + 1);
+      g.lineTo(x + whale.dir * 28 * s, y - rise - 6 * s); g.lineTo(x + whale.dir * 34 * s, y - rise + 2); g.fill();
+    }
+    if (e > 5.5 && e < 9.5) {                                                  // tail fluke rises, then slips under
+      const u = (e - 5.5) / 4, lift = Math.sin(u * Math.PI) * 34 * s, tx = x - whale.dir * 40 * s;
+      g.fillStyle = body;
+      g.beginPath(); g.moveTo(tx - 5 * s, y + 4); g.quadraticCurveTo(tx - 3 * s, y - lift * .6, tx - 24 * s, y - lift);
+      g.quadraticCurveTo(tx, y - lift + 7 * s, tx + 24 * s, y - lift); g.quadraticCurveTo(tx + 3 * s, y - lift * .6, tx + 5 * s, y + 4); g.fill();
+    }
+    g.restore();
+    if (e > .8 && e < 3.2) {                                                   // spout
+      const u = (e - .8) / 2.4;
+      for (let i = 0; i < 26; i++) {
+        const a = -Math.PI / 2 + (i / 25 - .5) * .7, v = (40 + (i * 13 % 17)) * s;
+        const px = x + whale.dir * 20 * s + Math.cos(a) * v * u, py = y - 8 * s + Math.sin(a) * v * u * 1.2 + 30 * s * u * u;
+        g.fillStyle = `rgba(240,250,255,${.75 * (1 - u)})`; g.beginPath(); g.arc(px, py, (1.5 + u * 2.5) * s, 0, 7); g.fill();
+      }
+    }
+    if (e < 9.8) {                                                             // foam ring at the waterline
+      g.strokeStyle = `rgba(255,255,255,${.65 * Math.min(1, e) * Math.min(1, (9.8 - e))})`; g.lineWidth = 1.6;
+      g.beginPath(); g.ellipse(x, y + 1, 60 * s, 4 * s, 0, 0, 7); g.stroke();
+    }
   }
 
   function drawFireFlames(g, t) {
@@ -528,8 +634,53 @@
     g.globalCompositeOperation = "source-atop";
     if (golden > .01) { g.fillStyle = `rgba(255,150,80,${golden})`; g.fillRect(0, 0, W, H); }
     if (stormA > .01) { g.fillStyle = `rgba(40,48,60,${stormA})`; g.fillRect(0, 0, W, H); }
-    if (nightA > .01) { g.fillStyle = `rgba(8,16,42,${nightA})`; g.fillRect(0, 0, W, H); }
+    if (nightA > .01) {
+      const mx = env.moonElev > 0 ? env.moon[0] : W / 2, my = env.moonElev > 0 ? env.moon[1] : -H;
+      const ng = g.createRadialGradient(mx, my, 0, mx, my, W * .9);
+      ng.addColorStop(0, `rgba(10,22,58,${nightA * .9})`); ng.addColorStop(.45, `rgba(6,14,42,${Math.min(.86, nightA * 1.2)})`);
+      ng.addColorStop(1, `rgba(4,9,30,${Math.min(.9, nightA * 1.32)})`);
+      g.fillStyle = ng; g.fillRect(0, 0, W, H);
+    }
     g.globalCompositeOperation = "source-over";
+  }
+
+  // Light from the sun or moon, drawn over the composited scene.
+  function drawLighting(g, t) {
+    const L = light();
+    if (env.sunElev > -0.05) {
+      const [x, y] = env.sun, up = sstep(-0.05, .25, env.sunElev), clear = 1 - wx_now.cloud * .8;
+      // warm sunlight falling across the scene, cooler shade on the far side
+      g.globalCompositeOperation = "soft-light";
+      const lg = g.createRadialGradient(x, y, 0, x, y, W * 1.1);
+      lg.addColorStop(0, `rgba(255,236,190,${.55 * up * clear})`); lg.addColorStop(.5, `rgba(255,210,150,${.18 * up * clear})`);
+      lg.addColorStop(1, `rgba(20,50,110,${.3 * up * clear})`);
+      g.fillStyle = lg; g.fillRect(0, 0, W, H);
+      // god rays through the clouds + bloom
+      g.globalCompositeOperation = "lighter";
+      const rayA = .028 * up * (.35 + wx_now.cloud) * (1 - wx_now.storm) * (1 - wx_now.fog * .6) * (1 - sstep(.5, .9, env.sunElev) * .5);
+      if (rayA > .004) {
+        for (let i = 0; i < 14; i++) {
+          const a = .22 * Math.PI + i / 13 * .56 * Math.PI + Math.sin(t * .07 + i) * .05, wdt = .02 + (i * 7 % 5) * .012, len = W * .95;
+          const rg = g.createRadialGradient(x, y, 0, x, y, len);
+          rg.addColorStop(0, `rgba(255,240,200,${rayA * (1 + (i % 3) * .4)})`); rg.addColorStop(.6, `rgba(255,240,200,${rayA * .3})`); rg.addColorStop(1, "rgba(255,240,200,0)");
+          g.fillStyle = rg; g.beginPath(); g.moveTo(x, y);
+          g.lineTo(x + Math.cos(a - wdt) * len, y + Math.sin(a - wdt) * len); g.lineTo(x + Math.cos(a + wdt) * len, y + Math.sin(a + wdt) * len); g.fill();
+        }
+      }
+      const bl = g.createRadialGradient(x, y, 0, x, y, 120 * Math.max(.6, S));
+      bl.addColorStop(0, `rgba(255,245,210,${.35 * up * clear})`); bl.addColorStop(1, "rgba(255,245,210,0)");
+      g.fillStyle = bl; g.beginPath(); g.arc(x, y, 120 * Math.max(.6, S), 0, 7); g.fill();
+      g.globalCompositeOperation = "source-over";
+    }
+    if (env.moonElev > 0 && env.dark > .3) {                                    // cool moonlight
+      const [x, y] = env.moon, k = env.dark * (1 - wx_now.cloud * .8);
+      g.globalCompositeOperation = "lighter";
+      const mg = g.createRadialGradient(x, y, 0, x, y, W * .55);
+      mg.addColorStop(0, `rgba(120,150,220,${.16 * k})`); mg.addColorStop(1, "rgba(120,150,220,0)");
+      g.fillStyle = mg; g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = "source-over";
+    }
+    return L;
   }
 
   // One full frame. `actors(g)` draws the moving game objects into the world layer
@@ -543,16 +694,19 @@
     wx.drawImage(L.island, 0, 0, W, H);
     geo.palms.forEach(([x, h, lean]) => drawPalm(wx, x, h, lean, t));
     drawBuoys(wx, t);
+    drawWhales(wx, t, now);
+    drawBirds(wx, t);
     const extraLights = actors ? actors(wx) : null;
     applyTint(wx);
     ctx.drawImage(wc, 0, 0, W, H);
+    drawLighting(ctx, t);
     drawFireFlames(ctx, t);
     drawLights(ctx, t, extraLights);
     drawWeatherFx(ctx, t, now);
   }
 
   window.Scene = {
-    resize, update, render, clockLabel, setWeather, WEATHER,
+    resize, update, render, clockLabel, setWeather, WEATHER, mood, drawBubble,
     force(name) { forced = name; if (name) setWeather(name, true); },
     release(next) { forced = null; setWeather(next || "sunny", false); },
     set onLightning(fn) { onLightning = fn; },

@@ -22,7 +22,7 @@
   #game { border-radius:12px; overflow:hidden; background:var(--panel); }
   #stage { position:relative; }
   canvas { display:block; width:100%; }
-  .pill { position:absolute; padding:4px 10px; border-radius:999px; background:rgba(0,0,0,.5);
+  .pill { position:absolute; padding:4px 10px; border-radius:999px; background:rgba(10,30,50,.42); backdrop-filter:blur(5px);
           color:#fff; font-size:12px; }
   #tag { left:10px; top:10px; max-width:calc(100% - 250px); }
   #hud { right:10px; top:10px; text-align:right; padding:6px 12px; border-radius:10px; font-size:14px; }
@@ -34,11 +34,12 @@
              pointer-events:none; }
   #overlay > div { pointer-events:auto; }
   .hidden { display:none !important; }
-  .dialog { background:rgba(10,28,44,.92); min-height:120px;
+  .dialog { background:rgba(16,44,70,.55); min-height:120px; backdrop-filter:blur(6px);
             border:2px solid var(--gold); border-radius:12px; padding:12px 16px; font-size:16px; line-height:1.45; }
   .dialog .who { color:var(--gold); font-weight:700; margin-bottom:4px; }
   .dialog .btns { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
-  .card-ov { background:rgba(10,28,44,.94); border:2px solid var(--gold); border-radius:14px;
+  .card-ov { background:rgba(14,40,64,.52); backdrop-filter:blur(7px) saturate(1.2); -webkit-backdrop-filter:blur(7px);
+             text-shadow:0 1px 2px rgba(0,0,0,.55); border:2px solid var(--gold); border-radius:14px;
              padding:14px 18px; width:min(560px, 92%); max-height:calc(100% - 10px); font-size:14px;
              display:flex; flex-direction:column; }
   .card-ov .body { overflow:auto; min-height:0; }
@@ -257,13 +258,13 @@ function frame(now) {
   Scene.update(dt, now);
   if (now - envTick > 500) { envTick = now; const el = document.getElementById("env"); if (el) el.textContent = Scene.clockLabel(); }
 
-  let banner = null;
+  let banner = null, bubble = null;
   Scene.render(t, now, (g) => {
     const geo = Scene.geo, S = Scene.S, HZ = Scene.HZ, linkY = geo.islandY(geo.linkX);
     if (phase === "intro") {
       const line = INTRO[introIdx];
       if (line.storm) drawWreckage(g, t);
-      Scene.drawLink(g, geo.linkX, linkY, t, !line.storm);
+      Scene.drawLink(g, geo.linkX, linkY, t, line.storm ? "sad" : "wave");
       if (line.bottle || line.whale) Scene.drawBottle(g, geo.linkX + 14 * Math.max(.6, S), linkY);
       if (line.whale) drawWhale(g, t);
       const el = document.getElementById("introText");
@@ -271,7 +272,8 @@ function frame(now) {
       return null;
     }
     if (phase === "flying" && anim) {
-      Scene.drawLink(g, geo.linkX, linkY, t, true);
+      Scene.drawLink(g, geo.linkX, linkY, t, "excited");
+      bubble = "Go, go, go!";
       const el = (now - anim.start) / 1000, done = drawFlights(g, anim.round, el);
       if (done && el > STAGGER * 2 + DURATION + 0.8) {
         if (anim.round.flights.some((f) => f.reached)) startRescue(); else { phase = "results"; renderAll(); }
@@ -298,11 +300,18 @@ function frame(now) {
       return [lamp];
     }
     if (phase === "rescued") return [Scene.drawBoat(g, Scene.sx(DOCK_M), t, true)];
-    Scene.drawLink(g, geo.linkX, linkY, t, phase !== "results");
+    if (phase === "results" && window.__lastRound) {
+      bubble = window.__lastRound.new_record ? "Aww... so close! New record, though." : "Aww... it crashed.";
+      Scene.drawLink(g, geo.linkX, linkY, t, "sad");
+    } else Scene.drawLink(g, geo.linkX, linkY, t, "wave");
     if (phase === "results" && window.__lastRound) drawFlights(g, window.__lastRound, 99);
     return null;
   });
 
+  if (bubble) {
+    const s = Math.max(.55, Scene.S) * 1.05, geo = Scene.geo;
+    Scene.drawBubble(Scene.ctx, geo.linkX + 8 * s, geo.islandY(geo.linkX) - 76 * s, bubble);
+  }
   if (banner) {
     const c = Scene.ctx, W = Scene.W;
     c.font = `bold ${W < 640 ? 16 : 24}px system-ui`; c.textAlign = "center";
@@ -331,6 +340,7 @@ muteEl.addEventListener("pointerdown", (e) => e.stopPropagation());
 muteEl.onclick = () => Music.toggle();
 document.addEventListener("pointerdown", () => { if (!Music.muted) Music.begin(); });
 Scene.onLightning = () => Music.thunder();
+Music.mood = () => Scene.mood();
 if (!Music.muted) toast("🔈 Music starts when you click in the game", 5000);
 
 // ---------------------------------------------------------------------------

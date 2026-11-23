@@ -322,6 +322,12 @@
     noiseHit(t + 0.15, 1.8, 0.3, "lowpass", 420, 0);
   }
 
+  function chime() {                                // new-upgrade fanfare
+    if (!ac || muted || ac.state !== "running") return;
+    const t = ac.currentTime + 0.02;
+    [72, 76, 79, 84].forEach((m, i) => bell(m, t + i * 0.09, 0.09));
+  }
+
   // Offline render of one piece, used only by automated tests to check levels
   // and to export short previews. Returns mono samples.
   async function renderOffline(i, seconds) {
@@ -337,7 +343,7 @@
   }
 
   window.Music = {
-    begin, thunder, setMuted, toggle() { setMuted(!muted); }, renderOffline,
+    begin, thunder, chime, setMuted, toggle() { setMuted(!muted); }, renderOffline,
     get muted() { return muted; }, tracks: TRACKS.map((t) => ({ title: t.title, mood: t.mood })),
     set onNowPlaying(fn) { onNowPlaying = fn; }, set onMuteChange(fn) { onMuteChange = fn; },
     set mood(fn) { moodFn = fn; },

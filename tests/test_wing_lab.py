@@ -166,6 +166,49 @@ def test_full_game_through_events_and_rescue():
     assert state["rescue_seen"]
 
 
+def _play(configs):
+    state = game.new_state()
+    for cfg in configs:
+        game.handle_event(state, {"action": "launch", "config": {**game.default_config(), **(cfg or {})}})
+    return state
+
+
+def test_every_round_has_a_lesson_without_performance_claims():
+    state = _play([None, {"families": ["cambered"] * 3}, {"families": ["cambered"] * 3},
+                   {"families": ["cambered", "symmetric", "cambered"], "angle": 1},
+                   {"families": ["cambered"] * 3, "angle": 1, "speed": 30},
+                   {"families": ["biomimetic", "cambered", "biomimetic"], "angle": 2, "speed": 30},
+                   {"families": ["biomimetic"] * 3, "angle": 2, "speed": 30, "bumps": [0, 3, 5]}])
+    banned = ["lift", "drag", "efficien", "optimal", "better wing", "best wing"]
+    for rnd in state["rounds"]:
+        les = rnd["lesson"]
+        assert les["title"] and les["explain"] and les["observation"]
+        text = " ".join([les["observation"], les["explain"], les["fair"] or "", les["tip"] or ""]).lower()
+        assert not any(b in text for b in banned), (rnd["round"], text)
+        assert les["sketch"]["x"] == round(max(f["x_over_c"] for f in rnd["flights"]), 3)
+
+
+def test_lesson_finds_fair_tests():
+    state = _play([None, {"families": ["cambered"] * 3}, {"families": ["cambered"] * 3},
+                   {"families": ["cambered", "symmetric", "cambered"], "angle": 1}])
+    les = state["rounds"][-1]["lesson"]
+    assert les["concept"] == "camber" and "only in wing shape" in les["fair"]
+    state = _play([None, None])
+    assert state["rounds"][-1]["lesson"]["concept"] in ("angle", "repeat", "camber")
+
+
+def test_lesson_flags_changing_many_things():
+    state = _play([None, {"families": ["cambered"] * 3}, {"families": ["cambered"] * 3},
+                   {"families": ["cambered"] * 3, "angle": 1},
+                   {"families": ["symmetric"] * 3, "angle": 12, "speed": 30}])
+    les = state["rounds"][-1]["lesson"]
+    assert les["tip"] and "one thing at a time" in les["tip"]
+
+
+def test_wing_names_have_no_materials():
+    assert all("name" not in s for s in game.STARTER_SLOTS)
+
+
 def test_results_dataframe_labels_game_values():
     state = game.new_state()
     game.handle_event(state, {"action": "launch", "config": None})

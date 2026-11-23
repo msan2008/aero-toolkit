@@ -33,7 +33,7 @@
   #hud .bar { height:5px; background:rgba(255,255,255,.25); border-radius:3px; margin-top:4px; }
   #hud .bar i { display:block; height:100%; background:var(--gold); border-radius:3px; }
   #hud small { color:#e3eef6; font-size:11px; }
-  #overlay { position:absolute; inset:52px 0 0 0; display:flex; align-items:center; justify-content:center;
+  #overlay { position:absolute; inset:8px 0 0 0; display:flex; align-items:center; justify-content:center;
              pointer-events:none; }
   #overlay > div { pointer-events:auto; }
   .hidden { display:none !important; }
@@ -43,7 +43,7 @@
   .dialog .btns { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
   .card-ov { background:rgba(14,40,64,.52); backdrop-filter:blur(7px) saturate(1.2); -webkit-backdrop-filter:blur(7px);
              text-shadow:0 1px 2px rgba(0,0,0,.55); border:2px solid var(--gold); border-radius:14px;
-             padding:14px 18px; width:min(560px, 92%); max-height:calc(100% - 10px); font-size:14px;
+             padding:12px 18px; width:min(560px, 92%); max-height:calc(100% - 16px); font-size:14px;
              display:flex; flex-direction:column; }
   .card-ov .body { overflow:auto; min-height:0; }
   .card-ov .foot { flex:0 0 auto; text-align:right; padding-top:10px; }
@@ -75,7 +75,8 @@
     #tag .long { display:none; } #tag .short { display:inline; }
     #hud { font-size:12px; padding:4px 8px; }
     .card-ov { font-size:12px; padding:10px 12px; } .card-ov h3 { font-size:16px; } .big { font-size:15px; }
-    .dialog { font-size:14px; }
+    .dialog { font-size:14px; flex-direction:column; } .dialog .figbox { flex-basis:auto; width:100%; }
+    .res-grid { grid-template-columns:1fr; } .unlock h3 { font-size:20px; } .unlock p { font-size:13px; }
     #footer { flex-wrap:wrap; } #envnote { flex-basis:100%; }
   }
   .wing { background:rgba(20,60,92,.5); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px; border-left:6px solid #999; font-size:13px; }
@@ -86,6 +87,34 @@
   .scout { margin-top:4px; color:var(--gold); font-weight:700; }
   #launch { width:100%; margin-top:10px; padding:10px; font-size:17px; }
   .err { color:#ffb3b3; margin-top:6px; font-size:13px; }
+  .dialog { display:flex; gap:16px; align-items:center; }
+  .dialog .txt { flex:1; min-width:0; }
+  .dialog .figbox { flex:0 0 330px; }
+  .notice { background:rgba(255,204,77,.16); border:1.5px solid var(--gold); border-radius:10px; padding:8px 12px;
+            margin-bottom:8px; font-size:14px; line-height:1.4; }
+  .lockchip { display:inline-block; margin-left:6px; font-size:11px; padding:1px 8px; border-radius:999px;
+              background:rgba(255,204,77,.22); color:#ffe39a; border:1px solid rgba(255,204,77,.6); vertical-align:middle; }
+  .famrow { display:flex; align-items:center; gap:8px; }
+  .famrow select { flex:1; }
+  svg.icon { flex:0 0 auto; width:80px; }
+  .new { border-radius:8px; animation:glow 1s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow:0 0 0 0 rgba(255,204,77,0); } to { box-shadow:0 0 0 4px rgba(255,204,77,.9); } }
+  .newtag { background:var(--gold); color:#1b1b1b; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px; margin-left:6px; }
+  .card-ov.wide { width:min(940px, 96%); }
+  .res-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:16px; align-items:start; }
+  .lab { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:10px; padding:8px 12px; }
+  .lab h4 { margin:0 0 4px; font-size:15px; color:var(--gold); }
+  .fair { color:#9ff5c4; font-size:12.5px; margin-top:5px; }
+  .tip { color:#ffd9a0; font-size:12.5px; margin-top:5px; }
+  .why { font-size:12.5px; color:#e3eef6; margin-top:6px; border-top:1px solid rgba(255,255,255,.12); padding-top:5px; }
+  .unlock { width:min(580px, 94%); border-width:3px; text-align:center;
+            animation:pop .45s ease-out, glow2 1.3s ease-in-out infinite alternate; }
+  @keyframes pop { from { transform:scale(.7); opacity:0; } to { transform:scale(1); opacity:1; } }
+  @keyframes glow2 { from { box-shadow:0 0 10px rgba(255,204,77,.35); } to { box-shadow:0 0 36px rgba(255,204,77,.95); } }
+  .unlock .kicker { color:var(--gold); font-weight:800; letter-spacing:.08em; font-size:13px; }
+  .unlock h3 { font-size:26px; margin:4px 0 8px; }
+  .unlock p { margin:8px 0; font-size:15px; line-height:1.45; }
+  .unlock .tryit { color:#ffe39a; font-weight:600; }
   #footer { display:flex; align-items:center; gap:10px; padding:2px 12px 10px; font-size:11px; color:var(--muted); }
   #np { opacity:0; transition:opacity .6s; color:#fff; font-size:12px; background:rgba(255,255,255,.1);
         padding:3px 10px; border-radius:999px; white-space:nowrap; }
@@ -111,6 +140,7 @@
 
 <script src="scene.js"></script>
 <script src="music.js"></script>
+<script src="figures.js"></script>
 <script>
 // ---------------------------------------------------------------------------
 // Streamlit component plumbing
@@ -137,14 +167,45 @@ const INTRO = [
   { storm: true,  text: "...and the waves washed me up here, on this tiny island. No radio. No boat. Just sand, palm trees and me." },
   { text: "The mainland is 1,000 metres away. Too far to swim, and no ships ever pass this way." },
   { bottle: true, text: "But I found an old glass bottle! If I put a message inside and glide it all the way to the mainland, someone will come and rescue me." },
-  { bottle: true, text: "I can build gliders from driftwood, palm leaves and scraps of sail. Each launch that beats my record earns points for better tools." },
-  { whale: true,  text: "Oh, and yesterday I saw a humpback whale. Its flippers have bumps along the front edge... I wonder if that idea could help a wing one day. Will you help me?" },
+  { bottle: true, fig: "flow", text: "To glide far, a wing needs air flowing smoothly over its top. If the air can't keep up, it breaks away into swirling, messy air. Scientists call this flow separation and mark where it happens as x/c: 0 at the front edge, 1 at the back. In this game, the farther back the air separates, the farther my glider goes." },
+  { fig: "shapes", text: "I can carve two wing shapes. A symmetric wing is the same on top and bottom. A cambered wing is arched on top, like a bird's wing. The shape changes how far back the air can follow the wing." },
+  { whale: true, fig: "whale", text: "Yesterday I saw a humpback whale. Its flippers have bumps along the front edge, called tubercles. Copying an idea from nature is called biomimicry. Maybe I can try it on a wing later!" },
+  { bottle: true, text: "Every launch that beats my record earns points for new workshop tools. Let's get this message to the mainland. Will you help me?" },
 ];
 let S = null, gen = null, phase = "loading", cfg = null, lastRound = 0;
 let introIdx = 0, introStart = 0, anim = null, waitingSince = 0;
+let unlockQueue = [], shownUnlockRound = 0;
+const newKeys = new Set();                        // upgrades to highlight until the next launch
+const UNLOCK_INFO = {
+  wing_types: { fig: () => Figures.shapes(["symmetric", "cambered"]),
+    text: "You can now choose the shape of each wing. A symmetric wing is the same on top and bottom; a cambered wing is arched on top.",
+    tryit: "Give two wings different shapes and keep everything else the same. That's a fair test!" },
+  angle: { fig: () => Figures.angle(10),
+    text: "Set the launch angle, the wing's angle of attack: how steeply it meets the oncoming air. All three wings use the same angle, so the comparison stays fair.",
+    tryit: "Try a low angle and a steep angle, and watch where the air separates." },
+  speed: { fig: () => "",
+    text: "Launch at 15 or 30 m/s. In this game a faster launch gives more launch power, but speed also changes how the air flows over the wing.",
+    tryit: "Launch the same wings at both speeds and compare their x/c." },
+  biomimetic: { fig: () => Figures.planform([32.7]),
+    text: "A wing with bumps (tubercles) along its front edge, copied from a humpback whale's flipper. Copying nature like this is called biomimicry.",
+    tryit: "Race a whale wing against a cambered wing at the same angle and speed." },
+  bump_height: { fig: () => Figures.planform([26.2, 32.7]),
+    text: "Choose from the six bump designs that were tested in the CFD simulations. Bump height and spacing change together, just like in the real tests.",
+    tryit: "Give each whale wing a different bump height and see which keeps the air attached longest." },
+  wind_scout: { fig: () => "",
+    text: "Ask the model to predict each wing's x/c before you launch. Engineers use quick predictions like this to screen designs before expensive tests.",
+    tryit: "Scout a few designs, then launch the most promising one." },
+};
+const UNLOCK_ICON = { speed: "💨", wind_scout: "🔭" };
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const has = (k) => S && S.unlocks.indexOf(k) >= 0;
+function pendingKeys() {                          // upgrades earned but not yet announced
+  if (phase === "unlock") return new Set(unlockQueue.map((u) => u.key));
+  if (S && S.last_round && S.last_round.new_unlocks.length && shownUnlockRound !== S.last_round.round)
+    return new Set(S.last_round.new_unlocks.map((u) => u.key));
+  return new Set();
+}
 
 window.addEventListener("message", (e) => {
   const d = e.data;
@@ -383,12 +444,32 @@ function renderOverlay() {
       ? `<div class="big gold" style="margin-top:8px">🏆 New record! +${r.points_earned} ⭐</div>`
       : `<div class="big" style="margin-top:8px">No new record, so no points this round.</div>
          <div class="muted">Try changing one thing at a time to see what helps.</div>`;
-    const unl = r.new_unlocks.map(u => `<div style="margin-top:6px">🔓 <b>${esc(u.title)}</b>: ${esc(u.text)}</div>`).join("");
-    ov.innerHTML = `<div class="card-ov"><h3>Round ${r.round} results</h3><div class="body">${rows}${pts}
+    const unl = r.new_unlocks.length ? `<div class="big gold" style="margin-top:8px">🎁 You unlocked something new!</div>` : "";
+    const L = r.lesson;
+    const lab = L ? `<div class="lab"><h4>🔬 Lab notes: ${esc(L.title)}</h4>
+      ${Figures.flow(L.sketch.family, L.sketch.angle, L.sketch.x)}
+      <div class="muted">${esc(L.sketch.wing)}, this round's latest separation point</div>
+      <div style="margin-top:5px">${esc(L.observation)}</div>
+      ${L.fair ? `<div class="fair">✅ ${esc(L.fair)}</div>` : ""}${L.tip ? `<div class="tip">🧪 ${esc(L.tip)}</div>` : ""}
+      <div class="why"><b>Why?</b> ${esc(L.explain)}</div></div>` : "";
+    ov.innerHTML = `<div class="card-ov wide"><h3>Round ${r.round} results</h3><div class="body"><div class="res-grid"><div>${rows}${pts}
       <div style="margin-top:4px">Total: <b class="gold">${S.points} ⭐</b> &nbsp; Record: <b>${Math.round(S.best)} m</b></div>${unl}
-      <div class="muted" style="margin-top:8px">x/c = real model prediction · distance and points = game rules</div></div>
-      <div class="foot"><button class="primary" id="nextRound">🛠️ Build next round</button></div></div>`;
-    document.getElementById("nextRound").onclick = toBuild;
+      <div class="muted" style="margin-top:8px">x/c = real model prediction · distance and points = game rules</div></div>${lab}</div></div>
+      <div class="foot"><button class="primary" id="nextRound">${continueLabel()}</button></div></div>`;
+    document.getElementById("nextRound").onclick = continueFromResults;
+    return;
+  }
+  if (phase === "unlock" && unlockQueue.length) {
+    const u = unlockQueue[0], info = UNLOCK_INFO[u.key] || { fig: () => "", text: u.text, tryit: "" };
+    const fig = info.fig() || `<div style="font-size:64px;line-height:1.2">${UNLOCK_ICON[u.key] || "🎁"}</div>`;
+    ov.innerHTML = `<div class="card-ov unlock"><div class="kicker">🔓 NEW UPGRADE UNLOCKED!</div><h3>${esc(u.title)}</h3>
+      <div class="body">${fig}<p>${esc(info.text)}</p>${info.tryit ? `<p class="tryit">👉 ${esc(info.tryit)}</p>` : ""}</div>
+      <div class="foot" style="text-align:center"><button class="primary" id="gotIt">${unlockQueue.length > 1 ? "Next upgrade ▶" : "Let me try it! 🛠️"}</button></div></div>`;
+    document.getElementById("gotIt").onclick = () => {
+      newKeys.add(u.key); if (u.key === "biomimetic") newKeys.add("wing_types");
+      unlockQueue.shift();
+      if (unlockQueue.length) { if (Music.chime) Music.chime(); renderOverlay(); } else toBuild();
+    };
     return;
   }
   if (phase === "rescued") {
@@ -404,15 +485,25 @@ function renderOverlay() {
 
 function finishIntro() { phase = "build"; renderAll(); send("intro_done"); }
 function toBuild() { phase = "build"; renderAll(); }
+function hasPendingUnlock() { const r = S && S.last_round; return !!(r && r.new_unlocks.length && shownUnlockRound !== r.round); }
+function continueLabel() { return hasPendingUnlock() ? "🎁 Open your new upgrade!" : "🛠️ Build next round"; }
+function continueFromResults() {
+  if (!hasPendingUnlock()) return toBuild();
+  shownUnlockRound = S.last_round.round; unlockQueue = S.last_round.new_unlocks.slice();
+  phase = "unlock"; if (Music.chime) Music.chime(); renderAll();
+}
 
 function renderPanel() {
   const panel = document.getElementById("panel");
   if (!S || phase === "loading") { panel.innerHTML = ""; return; }
   if (phase === "intro") {
     const last = introIdx === INTRO.length - 1;
-    panel.innerHTML = `<div class="dialog"><div class="who">🧍 Link</div><div id="introText"></div>
+    const line = INTRO[introIdx];
+    const fig = line.fig === "flow" ? Figures.flow("cambered", 6, 0.62) : line.fig === "shapes" ? Figures.shapes(["symmetric", "cambered"])
+              : line.fig === "whale" ? Figures.planform([30.4]) : "";
+    panel.innerHTML = `<div class="dialog"><div class="txt"><div class="who">🧍 Link <span class="muted">(${introIdx + 1}/${INTRO.length})</span></div><div id="introText"></div>
       <div class="btns"><button id="skip">Skip intro</button>
-      <button class="primary" id="next">${last ? "Let's build! 🛠️" : "Next ▶"}</button></div></div>`;
+      <button class="primary" id="next">${last ? "Let's build! 🛠️" : "Next ▶"}</button></div></div>${fig ? `<div class="figbox">${fig}</div>` : ""}</div>`;
     document.getElementById("next").onclick = () => {
       if (introIdx < INTRO.length - 1) { introIdx++; introStart = performance.now(); renderPanel(); }
       else finishIntro();
@@ -424,41 +515,47 @@ function renderPanel() {
     panel.innerHTML = `<div class="muted" style="padding:6px 2px">🎉 Workshop closed: Link is going home!</div>`; return;
   }
   const busy = phase !== "build";
-  const earned = S.upgrades.filter((u) => has(u.key));
-  const strip = earned.length
-    ? earned.map((u) => `<span class="badge">✓ ${esc(u.title)} · earned at ${u.points}⭐</span>`).join("")
-    : `<span class="badge hint">🧰 Beat your record to earn upgrades for the workshop!</span>`;
-  const angle = has("angle")
-    ? `<label>📐 Launch angle <b id="angVal">${cfg.angle}°</b><br><input id="ang" type="range" min="0" max="24" step="1" value="${cfg.angle}" ${busy ? "disabled" : ""}></label>`
+  const hidden = pendingKeys(), can = (k) => has(k) && !hidden.has(k);
+  const earned = S.upgrades.filter((u) => can(u.key));
+  const allDone = earned.length === S.upgrades.length;
+  const strip = !can("wing_types")
+    ? `<div class="notice">🔒 <b>Round 1:</b> Link only has scraps, so these three wings come pre-built and can't be changed yet. Just press <b>Launch!</b><br>
+       Every time you <b>beat your record</b>, you earn points that unlock new workshop tools.</div>`
+    : `<div class="strip">${earned.map((u) => `<span class="badge">✓ ${esc(u.title)} · earned at ${u.points}⭐</span>`).join("")}
+       ${allDone ? "" : `<span class="badge hint">🔒 More tools unlock as you beat your record</span>`}</div>`;
+  const nw = (k) => newKeys.has(k) ? " new" : "", tag = (k) => newKeys.has(k) ? `<span class="newtag">NEW</span>` : "";
+  const angle = can("angle")
+    ? `<label class="${nw("angle")}">📐 Launch angle <b id="angVal">${cfg.angle}°</b>${tag("angle")}<br><input id="ang" type="range" min="0" max="24" step="1" value="${cfg.angle}" ${busy ? "disabled" : ""}></label>`
     : "";
-  const speed = has("speed")
-    ? `<span>💨 Speed ${S.speeds.map(v => `<button class="seg ${cfg.speed === v ? "on" : ""}" data-speed="${v}" ${busy ? "disabled" : ""}>${v} m/s</button>`).join(" ")}</span>`
+  const speed = can("speed")
+    ? `<span class="${nw("speed")}">💨 Speed${tag("speed")} ${S.speeds.map(v => `<button class="seg ${cfg.speed === v ? "on" : ""}" data-speed="${v}" ${busy ? "disabled" : ""}>${v} m/s</button>`).join(" ")}</span>`
     : "";
-  const scoutBtn = has("wind_scout") ? `<button id="scout" ${busy ? "disabled" : ""}>🔭 Scout x/c</button>` : "";
+  const scoutBtn = can("wind_scout") ? `<button id="scout" class="${nw("wind_scout")}" ${busy ? "disabled" : ""}>🔭 Scout x/c${tag("wind_scout")}</button>` : "";
   const scoutOk = S.scout && JSON.stringify(S.scout.config) === JSON.stringify(cfg);
-  const families = ["symmetric", "cambered"].concat(has("biomimetic") ? ["biomimetic"] : []);
+  const families = ["symmetric", "cambered"].concat(can("biomimetic") ? ["biomimetic"] : []);
   const cards = [0, 1, 2].map(i => {
     const fam = cfg.families[i], st = S.starters[i];
-    const famCtl = has("wing_types")
-      ? `<select data-fam="${i}" ${busy ? "disabled" : ""}>${families.map(f => `<option value="${f}" ${f === fam ? "selected" : ""}>${FAMILY[f]}</option>`).join("")}</select>`
-      : `${FAMILY[fam]} 🔒`;
+    const famCtl = `<div class="famrow">${Figures.icon(fam)}` + (can("wing_types")
+      ? `<select class="${nw(can("biomimetic") && newKeys.has("biomimetic") ? "biomimetic" : "wing_types")}" data-fam="${i}" ${busy ? "disabled" : ""}>${families.map(f => `<option value="${f}" ${f === fam ? "selected" : ""}>${FAMILY[f]}</option>`).join("")}</select>`
+      : `<span><b>${FAMILY[fam]}</b><span class="lockchip">🔒 locked for now</span></span>`) + `</div>`;
     let bump = "";
     if (fam === "biomimetic") {
       const g = S.bumps[cfg.bumps[i]];
-      bump = has("bump_height")
-        ? `<div style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b><input type="range" min="0" max="${S.bumps.length - 1}" step="1" value="${cfg.bumps[i]}" data-bump="${i}" ${busy ? "disabled" : ""}></div>`
-        : `<div style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b> 🔒</div>`;
+      bump = can("bump_height")
+        ? `<div class="${nw("bump_height")}" style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b>${tag("bump_height")}<input type="range" min="0" max="${S.bumps.length - 1}" step="1" value="${cfg.bumps[i]}" data-bump="${i}" ${busy ? "disabled" : ""}></div>`
+        : `<div style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b><span class="lockchip">🔒 locked for now</span></div>`;
       bump += `<div class="muted">Bumps ${g.amp.toFixed(1)} mm tall, ${g.wave.toFixed(1)} mm apart</div>`;
     }
-    const ang = has("angle") ? cfg.angle : st.angle;
+    const ang = can("angle") ? cfg.angle : st.angle;
     const scout = scoutOk ? `<div class="scout">🔭 Model x/c ${S.scout.x[i].toFixed(2)}</div>` : "";
-    return `<div class="wing" style="border-left-color:${COLOURS[i]}"><div class="t">Wing ${"ABC"[i]} · ${esc(st.name)}</div>
-      ${famCtl}${bump}<div class="muted" style="margin-top:4px">${ang}° · ${has("speed") ? cfg.speed : S.speeds[0]} m/s</div>${scout}</div>`;
+    return `<div class="wing" style="border-left-color:${COLOURS[i]}"><div class="t">Wing ${"ABC"[i]}</div>
+      ${famCtl}${bump}<div class="muted" style="margin-top:4px">Angle ${ang}°${can("angle") ? "" : " 🔒"} · ${can("speed") ? cfg.speed : S.speeds[0]} m/s${can("speed") ? "" : " 🔒"}</div>${scout}</div>`;
   }).join("");
-  const label = phase === "waiting" ? "⏳ Launching..." : phase === "flying" ? "✈️ Flying..." : phase === "results" ? "🛠️ Build next round" : "🚀 Launch!";
-  panel.innerHTML = `<div class="strip">${strip}</div>
+  const label = phase === "waiting" ? "⏳ Launching..." : phase === "flying" ? "✈️ Flying..." : phase === "results" ? continueLabel()
+              : phase === "unlock" ? "🎁 Check out your new upgrade above!" : "🚀 Launch!";
+  panel.innerHTML = `${strip}
     ${angle || speed || scoutBtn ? `<div class="controls">${angle}${speed}${scoutBtn}</div>` : ""}
-    ${has("bump_height") ? '<div class="muted" style="margin-bottom:6px">In the CFD data, bump height and spacing always changed together, so the six real designs are offered as pairs.</div>' : ""}
+    ${can("bump_height") ? '<div class="muted" style="margin-bottom:6px">In the CFD data, bump height and spacing always changed together, so the six real designs are offered as pairs.</div>' : ""}
     <div class="cards">${cards}</div>
     <button id="launch" class="primary" ${busy && phase !== "results" ? "disabled" : ""}>${label}</button>
     ${S.error ? `<div class="err">⚠️ ${esc(S.error)}</div>` : ""}`;
@@ -473,7 +570,7 @@ function renderPanel() {
     r.onchange = () => renderPanel();
   });
   if (q("#scout")) q("#scout").onclick = () => send("scout", { config: cfg });
-  q("#launch").onclick = () => { if (phase === "results") return toBuild(); phase = "waiting"; waitingSince = performance.now(); renderPanel(); send("launch", { config: cfg }); };
+  q("#launch").onclick = () => { if (phase === "results") return continueFromResults(); if (phase !== "build") return; newKeys.clear(); phase = "waiting"; waitingSince = performance.now(); renderPanel(); send("launch", { config: cfg }); };
 }
 
 post("streamlit:componentReady", { apiVersion: 1 });

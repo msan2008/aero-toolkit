@@ -61,7 +61,8 @@ def frontend_state(s: dict) -> dict:
         r = s["rounds"][-1]
         last = {
             "round": r["round"], "points_earned": r["points_earned"], "new_record": r["new_record"],
-            "new_unlocks": [{"title": u["title"], "text": u["text"]} for u in r["new_unlocks"]],
+            "new_unlocks": [{"key": u["key"], "title": u["title"], "text": u["text"]} for u in r["new_unlocks"]],
+            "lesson": r.get("lesson"),
             "flights": [{
                 "name": f["name"], "family": f["inputs"]["airfoil_family"],
                 "amp": f["inputs"]["tubercle_amplitude"], "angle": int(f["inputs"]["angle_of_attack"]),
@@ -75,7 +76,7 @@ def frontend_state(s: dict) -> dict:
         "unlocks": sorted(unlocks),
         "upgrades": [{k: u[k] for k in ("key", "points", "title", "text")} for u in game.UPGRADES],
         "config": s["config"], "scout": s["scout"], "error": s["error"],
-        "starters": [{"name": x["name"], "family": x["airfoil_family"], "angle": x["angle_of_attack"]}
+        "starters": [{"family": x["airfoil_family"], "angle": x["angle_of_attack"]}
                      for x in game.STARTER_SLOTS],
         "bumps": [{"amp": g["tubercle_amplitude"], "wave": g["tubercle_wavelength"]}
                   for g in game.TUBERCLE_GEOMETRIES],
@@ -177,6 +178,15 @@ if state["won"] and state["rescue_seen"]:
             "Points, upgrades, and the mainland at 1,000 m",
         ],
     }))
+    learned = []
+    for rnd in state["rounds"]:
+        les = rnd.get("lesson")
+        if les and les["title"] not in [t for t, _ in learned]:
+            learned.append((les["title"], les["explain"]))
+    if learned:
+        st.subheader("🔬 What you discovered in the lab")
+        for title, text in learned:
+            st.markdown(f"**{title}:** {text}")
     st.subheader("🧠 Think like an engineer")
     choice = st.radio(
         "In the game, wings with higher x/c flew farther. Does later separation mean a real wing always flies farther?",

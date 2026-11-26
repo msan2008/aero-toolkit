@@ -8,4 +8,4 @@ sweep_angle: This is the angle at which the wing is "tilted" in respect to the f
 angle_of_attack: This is the angle at which the wing design faces incoming airflow. 
 airspeed: The velocity of the air. 
 separation_x_over_c: This is the predicted location at which airflow separates from the upper surface of the wing design as a percentage of its chord.
-data_source: Details where the data came from - either OpenFOAM or Autodesk CFD. 
+data_source: Details where the data came from - all data was generated with Autodesk CFD. 

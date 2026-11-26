@@ -206,7 +206,7 @@ with st.expander("ℹ️ About the model and its limits"):
     mae = f"{metrics['mae']:.3f} x/c" if "mae" in metrics else "N/A"
     r2 = f"{metrics['r2']:.3f}" if "r2" in metrics else "N/A"
     st.markdown(
-        f"- **Model:** `{Path(get_loaded_model_path()).name}` (Extra Trees), ~1,700 OpenFOAM CFD runs; "
+        f"- **Model:** `{Path(get_loaded_model_path()).name}` (Extra Trees), ~1,700 Autodesk CFD runs; "
         f"test MAE {mae}, R² {r2}\n"
         "- **Predicts** separation location (x/c) only, not lift, drag, distance or efficiency\n"
         "- **Inputs:** the 3 wing types, 6 CFD bump designs, 0–24°, 15 or 30 m/s\n"

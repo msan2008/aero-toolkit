@@ -226,7 +226,7 @@ with st.expander("ℹ️ About the model and its limits"):
     r2 = f"{metrics['r2']:.3f}" if "r2" in metrics else "N/A"
     st.markdown(
         f"- **Model file:** `{Path(get_loaded_model_path()).name}` (Extra Trees regressor)\n"
-        "- **Trained on:** about 1,700 OpenFOAM CFD simulations (Phase 2 dataset)\n"
+        "- **Trained on:** about 1,700 Autodesk CFD simulations (Phase 2 dataset)\n"
         f"- **Held-out test error:** MAE {mae}, R² {r2}\n"
         "- **Predicts:** separation location `separation_x_over_c` only\n"
         "- **Does not predict:** lift, drag, flight distance, efficiency, battery life, or emissions\n"

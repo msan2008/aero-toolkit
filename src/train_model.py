@@ -6,7 +6,7 @@ run locally from the repo root with:
     python src/train_model.py
 
 Default inputs and outputs:
-    input CSV:      data/processed/openfoam_phase1_cleaned.csv
+    input CSV:      data/processed/autodesk_cfd_phase2_cleaned.csv
     model artifact: models/notebook2_gradient_boosting.joblib
     metadata JSON:  models/notebook2_model_metadata.json
     predictions:    models/notebook2_gradient_boosting_holdout_predictions.csv
@@ -387,7 +387,7 @@ def train_and_save(
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    default_data_path = PROCESSED_DATA_DIR / "openfoam_phase1_cleaned.csv"
+    default_data_path = PROCESSED_DATA_DIR / "autodesk_cfd_phase2_cleaned.csv"
     default_model_output = MODELS_DIR / "notebook2_gradient_boosting.joblib"
     default_metadata_output = MODELS_DIR / "notebook2_model_metadata.json"
     default_predictions_output = MODELS_DIR / "notebook2_gradient_boosting_holdout_predictions.csv"

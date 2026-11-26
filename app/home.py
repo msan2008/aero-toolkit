@@ -4,7 +4,7 @@ import streamlit as st
 
 st.title("🛩️ WingCheck")
 st.markdown(
-    "A machine-learning model, trained on ~1,700 CFD simulations, that predicts "
+    "A machine-learning model, trained on ~1,700 Autodesk CFD simulations, that predicts "
     "**where airflow separates from a wing**. Pick a mode:"
 )
 

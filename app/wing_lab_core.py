@@ -32,7 +32,7 @@ from src.inference import get_model_metrics, get_required_feature_columns, predi
 # -----------------------------------------------------------------------------
 # Model-supported inputs (MODEL side, do not loosen)
 # -----------------------------------------------------------------------------
-# The six biomimetic tubercle geometries in data/processed/openfoam_phase2_cleaned.csv
+# The six biomimetic tubercle geometries in data/processed/autodesk_cfd_phase2_cleaned.csv
 # (all shape "whale"). Amplitude and wavelength are paired in the data, so they
 # are offered as pairs, ordered by amplitude ("bump height").
 TUBERCLE_GEOMETRIES: List[Dict[str, float]] = [

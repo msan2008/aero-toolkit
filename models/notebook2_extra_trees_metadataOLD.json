@@ -1,5 +1,5 @@
 {
-  "dataset_path": "openfoam_phase2_cleaned.csv",
+  "dataset_path": "autodesk_cfd_phase2_cleaned.csv",
   "target_column": "separation_x_over_c",
   "feature_columns_used": [
     "airfoil_family",

@@ -192,7 +192,7 @@ def test_lesson_finds_fair_tests():
     state = _play([None, {"families": ["cambered"] * 3}, {"families": ["cambered"] * 3},
                    {"families": ["cambered", "symmetric", "cambered"], "angle": 1}])
     les = state["rounds"][-1]["lesson"]
-    assert les["concept"] == "camber" and "only in wing shape" in les["fair"]
+    assert les["concept"] == "camber" and "only the wing shape differed" in les["fair"]
     state = _play([None, None])
     assert state["rounds"][-1]["lesson"]["concept"] in ("angle", "repeat", "camber")
 

@@ -19,7 +19,7 @@ from src.inference import predict_with_clipping  # noqa: E402
 import wing_lab_core as game  # noqa: E402
 
 ENTRY = str(ROOT / "app" / "app.py")
-DATA = pd.read_csv(ROOT / "data/processed/openfoam_phase2_cleaned.csv")
+DATA = pd.read_csv(ROOT / "data/processed/autodesk_cfd_phase2_cleaned.csv")
 
 
 @pytest.fixture(scope="module")

@@ -8,7 +8,7 @@ Expected repo location:
         src/utils.py
         src/preprocess.py
         src/train_model.py
-        data/processed/autodesk_cfd_phase1_cleaned.csv
+        data/processed/autodesk_cfd_phase2_cleaned.csv
         models/notebook2_gradient_boosting.joblib
 """
 

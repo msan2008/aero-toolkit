@@ -14,7 +14,7 @@
     <- parent: streamlit:render  (event.data.args.state)
 -->
 <style>
-  :root { --panel:#0f2d44; --card:#173f5c; --card2:#1d4b6c; --ink:#f4f8fb; --muted:#a9c3d6;
+  :root { --orange:#ff7a00; --red:#ff3b30; --panel:#0f2d44; --card:#173f5c; --card2:#1d4b6c; --ink:#f4f8fb; --muted:#a9c3d6;
           --gold:#ffcc4d; --accent:#ff5a5f; --ok:#3ecf8e; }
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; background:var(--panel); color:var(--ink);
@@ -38,11 +38,11 @@
   #overlay > div { pointer-events:auto; }
   .hidden { display:none !important; }
   .dialog { background:rgba(16,44,70,.55); min-height:120px; backdrop-filter:blur(6px);
-            border:2px solid var(--gold); border-radius:12px; padding:12px 16px; font-size:16px; line-height:1.45; }
+            border:3px solid var(--orange); border-radius:12px; padding:12px 16px; font-size:16px; line-height:1.45; }
   .dialog .who { color:var(--gold); font-weight:700; margin-bottom:4px; }
   .dialog .btns { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
   .card-ov { background:rgba(14,40,64,.52); backdrop-filter:blur(7px) saturate(1.2); -webkit-backdrop-filter:blur(7px);
-             text-shadow:0 1px 2px rgba(0,0,0,.55); border:2px solid var(--gold); border-radius:14px;
+             text-shadow:0 1px 2px rgba(0,0,0,.55); border:3px solid var(--orange); border-radius:14px;
              padding:12px 18px; width:min(560px, 92%); max-height:calc(100% - 16px); font-size:14px;
              display:flex; flex-direction:column; }
   .card-ov .body { overflow:auto; min-height:0; }
@@ -90,31 +90,51 @@
   .dialog { display:flex; gap:16px; align-items:center; }
   .dialog .txt { flex:1; min-width:0; }
   .dialog .figbox { flex:0 0 330px; }
-  .notice { background:rgba(255,204,77,.16); border:1.5px solid var(--gold); border-radius:10px; padding:8px 12px;
+  .notice { background:rgba(255,122,0,.16); border:3px solid var(--orange); border-radius:10px; padding:8px 12px;
             margin-bottom:8px; font-size:14px; line-height:1.4; }
-  .lockchip { display:inline-block; margin-left:6px; font-size:11px; padding:1px 8px; border-radius:999px;
-              background:rgba(255,204,77,.22); color:#ffe39a; border:1px solid rgba(255,204,77,.6); vertical-align:middle; }
+  .lockchip { display:inline-block; margin-left:6px; font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px;
+              background:rgba(255,59,48,.2); color:#ffd6d2; border:2px solid var(--red); vertical-align:middle; }
   .famrow { display:flex; align-items:center; gap:8px; }
   .famrow select { flex:1; }
   svg.icon { flex:0 0 auto; width:80px; }
-  .new { border-radius:8px; animation:glow 1s ease-in-out infinite alternate; }
-  @keyframes glow { from { box-shadow:0 0 0 0 rgba(255,204,77,0); } to { box-shadow:0 0 0 4px rgba(255,204,77,.9); } }
-  .newtag { background:var(--gold); color:#1b1b1b; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px; margin-left:6px; }
+  .new { border-radius:8px; outline:3px solid var(--orange); outline-offset:2px; animation:glow 1s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow:0 0 0 0 rgba(255,122,0,0); } to { box-shadow:0 0 14px 4px rgba(255,122,0,.85); } }
+  .newtag { background:var(--orange); color:#fff; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px; margin-left:6px; }
   .card-ov.wide { width:min(940px, 96%); }
   .res-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:16px; align-items:start; }
   .lab { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:10px; padding:8px 12px; }
   .lab h4 { margin:0 0 4px; font-size:15px; color:var(--gold); }
-  .fair { color:#9ff5c4; font-size:12.5px; margin-top:5px; }
-  .tip { color:#ffd9a0; font-size:12.5px; margin-top:5px; }
+  .fair { font-size:12.5px; margin-top:6px; padding:4px 8px; border:2px solid var(--orange); border-radius:8px; background:rgba(255,122,0,.12); }
+  .tip { font-size:12.5px; margin-top:6px; padding:4px 8px; border:2px solid var(--red); border-radius:8px; background:rgba(255,59,48,.12); }
+  .flag { display:inline-block; margin-top:8px; padding:3px 10px; border-radius:8px; font-size:16px; font-weight:700; }
+  .flag.ok { border:2px solid var(--orange); background:rgba(255,122,0,.18); color:#ffd27a; }
+  .flag.bad { border:2px solid var(--red); background:rgba(255,59,48,.16); color:#ffd6d2; }
+  .roadmap { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:8px; }
+  .rm-title { font-size:13px; font-weight:700; margin-right:4px; }
+  .slot { position:relative; font-size:12px; padding:3px 10px; border-radius:999px; cursor:help; outline:none; }
+  .slot.got { border:2px solid var(--orange); background:rgba(255,122,0,.2); color:#fff; font-weight:600; }
+  .slot.locked { border:2px dashed var(--red); background:rgba(255,59,48,.1); color:#ffd6d2; }
+  .slot .tipbox { display:none; position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); z-index:5;
+                  width:220px; padding:8px 10px; border-radius:10px; border:2px solid var(--orange); background:rgba(10,30,50,.95);
+                  color:#fff; font-size:12px; font-weight:400; line-height:1.35; text-align:left; white-space:normal; }
+  .slot.locked .tipbox { border-color:var(--red); }
+  .slot:hover .tipbox, .slot:focus .tipbox { display:block; }
+  .tipfig { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  #coach { position:absolute; z-index:20; width:min(300px, 86%); padding:10px 12px; border-radius:12px; border:3px solid var(--orange);
+           background:rgba(10,30,50,.94); box-shadow:0 0 24px rgba(255,122,0,.55); font-size:14px; line-height:1.4; }
+  #coach .who { color:#ffb15c; font-weight:800; font-size:12px; letter-spacing:.06em; margin-bottom:3px; }
+  #coach .btns { display:flex; justify-content:space-between; gap:8px; margin-top:8px; }
+  .coach-target { outline:3px solid var(--orange) !important; outline-offset:3px; border-radius:10px;
+                  box-shadow:0 0 18px 4px rgba(255,122,0,.75) !important; }
   .why { font-size:12.5px; color:#e3eef6; margin-top:6px; border-top:1px solid rgba(255,255,255,.12); padding-top:5px; }
-  .unlock { width:min(580px, 94%); border-width:3px; text-align:center;
+  .unlock { width:min(560px, 94%); border-width:4px; text-align:center;
             animation:pop .45s ease-out, glow2 1.3s ease-in-out infinite alternate; }
   @keyframes pop { from { transform:scale(.7); opacity:0; } to { transform:scale(1); opacity:1; } }
-  @keyframes glow2 { from { box-shadow:0 0 10px rgba(255,204,77,.35); } to { box-shadow:0 0 36px rgba(255,204,77,.95); } }
-  .unlock .kicker { color:var(--gold); font-weight:800; letter-spacing:.08em; font-size:13px; }
+  @keyframes glow2 { from { box-shadow:0 0 10px rgba(255,122,0,.35); } to { box-shadow:0 0 36px rgba(255,122,0,.95); } }
+  .unlock .kicker { color:#ffb15c; font-weight:800; letter-spacing:.08em; font-size:13px; }
   .unlock h3 { font-size:26px; margin:4px 0 8px; }
   .unlock p { margin:8px 0; font-size:15px; line-height:1.45; }
-  .unlock .tryit { color:#ffe39a; font-weight:600; }
+  .unlock .tryit { display:inline-block; padding:3px 10px; border:2px solid var(--orange); border-radius:8px; color:#ffd27a; font-weight:600; }
   #footer { display:flex; align-items:center; gap:10px; padding:2px 12px 10px; font-size:11px; color:var(--muted); }
   #np { opacity:0; transition:opacity .6s; color:#fff; font-size:12px; background:rgba(255,255,255,.1);
         padding:3px 10px; border-radius:999px; white-space:nowrap; }
@@ -131,9 +151,10 @@
     <div id="hud" class="pill"></div>
     <div id="overlay"></div>
   </div>
+  <div id="coach" class="hidden"></div>
   <div id="controls">
   <div id="panel"></div>
-  <div id="footer"><span id="envnote">🌦️ Weather and time of day are just scenery. They never change predictions, distances or points.</span>
+  <div id="footer"><span id="envnote">🌦️ Weather and time are scenery only.</span>
     <span class="grow"></span><span id="np"></span><button id="mute" aria-label="Mute music">🔊</button></div>
   </div>
 </div>
@@ -163,38 +184,22 @@ new ResizeObserver(fitHeight).observe(document.body);
 const COLOURS = ["#ff8c42", "#e84a5f", "#a066d3"];
 const FAMILY = { symmetric: "Symmetric", cambered: "Cambered", biomimetic: "🐋 Whale wing" };
 const INTRO = [
-  { storm: true,  text: "My name is Link. Three weeks ago a storm smashed my little boat to pieces..." },
-  { storm: true,  text: "...and the waves washed me up here, on this tiny island. No radio. No boat. Just sand, palm trees and me." },
-  { text: "The mainland is 1,000 metres away. Too far to swim, and no ships ever pass this way." },
-  { bottle: true, text: "But I found an old glass bottle! If I put a message inside and glide it all the way to the mainland, someone will come and rescue me." },
-  { bottle: true, fig: "flow", text: "To glide far, a wing needs air flowing smoothly over its top. If the air can't keep up, it breaks away into swirling, messy air. Scientists call this flow separation and mark where it happens as x/c: 0 at the front edge, 1 at the back. In this game, the farther back the air separates, the farther my glider goes." },
-  { fig: "shapes", text: "I can carve two wing shapes. A symmetric wing is the same on top and bottom. A cambered wing is arched on top, like a bird's wing. The shape changes how far back the air can follow the wing." },
-  { whale: true, fig: "whale", text: "Yesterday I saw a humpback whale. Its flippers have bumps along the front edge, called tubercles. Copying an idea from nature is called biomimicry. Maybe I can try it on a wing later!" },
-  { bottle: true, text: "Every launch that beats my record earns points for new workshop tools. Let's get this message to the mainland. Will you help me?" },
+  { storm: true, text: "I'm Link. A storm wrecked my boat and stranded me on this island." },
+  { bottle: true, text: "The mainland is 1,000 m away. If I glide a message in a bottle there, I'll be rescued!" },
+  { bottle: true, fig: "flow", text: "Air must flow smoothly over a wing. Where it breaks away is x/c (0 = front, 1 = back). Later = farther glide." },
+  { whale: true, fig: "shapes", text: "I can carve symmetric wings (same top and bottom) or cambered ones (arched top). And that whale's bumpy flippers give me an idea for later..." },
 ];
 let S = null, gen = null, phase = "loading", cfg = null, lastRound = 0;
 let introIdx = 0, introStart = 0, anim = null, waitingSince = 0;
 let unlockQueue = [], shownUnlockRound = 0;
 const newKeys = new Set();                        // upgrades to highlight until the next launch
 const UNLOCK_INFO = {
-  wing_types: { fig: () => Figures.shapes(["symmetric", "cambered"]),
-    text: "You can now choose the shape of each wing. A symmetric wing is the same on top and bottom; a cambered wing is arched on top.",
-    tryit: "Give two wings different shapes and keep everything else the same. That's a fair test!" },
-  angle: { fig: () => Figures.angle(10),
-    text: "Set the launch angle, the wing's angle of attack: how steeply it meets the oncoming air. All three wings use the same angle, so the comparison stays fair.",
-    tryit: "Try a low angle and a steep angle, and watch where the air separates." },
-  speed: { fig: () => "",
-    text: "Launch at 15 or 30 m/s. In this game a faster launch gives more launch power, but speed also changes how the air flows over the wing.",
-    tryit: "Launch the same wings at both speeds and compare their x/c." },
-  biomimetic: { fig: () => Figures.planform([32.7]),
-    text: "A wing with bumps (tubercles) along its front edge, copied from a humpback whale's flipper. Copying nature like this is called biomimicry.",
-    tryit: "Race a whale wing against a cambered wing at the same angle and speed." },
-  bump_height: { fig: () => Figures.planform([26.2, 32.7]),
-    text: "Choose from the six bump designs that were tested in the CFD simulations. Bump height and spacing change together, just like in the real tests.",
-    tryit: "Give each whale wing a different bump height and see which keeps the air attached longest." },
-  wind_scout: { fig: () => "",
-    text: "Ask the model to predict each wing's x/c before you launch. Engineers use quick predictions like this to screen designs before expensive tests.",
-    tryit: "Scout a few designs, then launch the most promising one." },
+  wing_types: { fig: () => Figures.shapes(["symmetric", "cambered"]), text: "Pick each wing's shape.", tryit: "Change only the shape: a fair test!" },
+  angle: { fig: () => Figures.angle(10), text: "Set the launch angle (angle of attack).", tryit: "Compare a low and a steep angle." },
+  speed: { fig: () => "", text: "Launch at 15 or 30 m/s.", tryit: "Same wings, both speeds: compare x/c." },
+  biomimetic: { fig: () => Figures.planform([32.7]), text: "Whale-flipper bumps on the front edge. That's biomimicry!", tryit: "Race it against a cambered wing." },
+  bump_height: { fig: () => Figures.planform([26.2, 32.7]), text: "Choose from 6 CFD-tested bump sizes.", tryit: "Give each whale wing a different size." },
+  wind_scout: { fig: () => "", text: "Preview each wing's x/c before launching.", tryit: "Scout first, then launch your pick." },
 };
 const UNLOCK_ICON = { speed: "💨", wind_scout: "🔭" };
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -422,7 +427,7 @@ if (!Music.muted) toast("🔈 Music starts when you click in the game", 5000);
 // ---------------------------------------------------------------------------
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
-function renderAll() { renderHud(); renderOverlay(); renderPanel(); fitHeight(); }
+function renderAll() { renderHud(); renderOverlay(); renderPanel(); fitHeight(); renderTutorial(); }
 
 function renderHud() {
   const hud = document.getElementById("hud");
@@ -441,20 +446,19 @@ function renderOverlay() {
       <span class="muted">${f.angle}° · ${f.speed} m/s · model x/c <b>${f.x.toFixed(2)}</b></span></span>
       <span class="big">${Math.round(f.distance)} m</span></div>`).join("");
     const pts = r.new_record
-      ? `<div class="big gold" style="margin-top:8px">🏆 New record! +${r.points_earned} ⭐</div>`
-      : `<div class="big" style="margin-top:8px">No new record, so no points this round.</div>
-         <div class="muted">Try changing one thing at a time to see what helps.</div>`;
-    const unl = r.new_unlocks.length ? `<div class="big gold" style="margin-top:8px">🎁 You unlocked something new!</div>` : "";
+      ? `<div class="flag ok">🏆 New record! +${r.points_earned} ⭐</div>`
+      : `<div class="flag bad">No new record: 0 points</div>`;
+    const unl = r.new_unlocks.length ? `<div class="flag ok">🎁 New tool unlocked!</div>` : "";
     const L = r.lesson;
     const lab = L ? `<div class="lab"><h4>🔬 Lab notes: ${esc(L.title)}</h4>
       ${Figures.flow(L.sketch.family, L.sketch.angle, L.sketch.x)}
-      <div class="muted">${esc(L.sketch.wing)}, this round's latest separation point</div>
+      <div class="muted">Sketch: ${esc(L.sketch.wing)}</div>
       <div style="margin-top:5px">${esc(L.observation)}</div>
       ${L.fair ? `<div class="fair">✅ ${esc(L.fair)}</div>` : ""}${L.tip ? `<div class="tip">🧪 ${esc(L.tip)}</div>` : ""}
       <div class="why"><b>Why?</b> ${esc(L.explain)}</div></div>` : "";
     ov.innerHTML = `<div class="card-ov wide"><h3>Round ${r.round} results</h3><div class="body"><div class="res-grid"><div>${rows}${pts}
       <div style="margin-top:4px">Total: <b class="gold">${S.points} ⭐</b> &nbsp; Record: <b>${Math.round(S.best)} m</b></div>${unl}
-      <div class="muted" style="margin-top:8px">x/c = real model prediction · distance and points = game rules</div></div>${lab}</div></div>
+      <div class="muted" style="margin-top:8px">x/c = real prediction · distance &amp; points = game</div></div>${lab}</div></div>
       <div class="foot"><button class="primary" id="nextRound">${continueLabel()}</button></div></div>`;
     document.getElementById("nextRound").onclick = continueFromResults;
     return;
@@ -462,9 +466,9 @@ function renderOverlay() {
   if (phase === "unlock" && unlockQueue.length) {
     const u = unlockQueue[0], info = UNLOCK_INFO[u.key] || { fig: () => "", text: u.text, tryit: "" };
     const fig = info.fig() || `<div style="font-size:64px;line-height:1.2">${UNLOCK_ICON[u.key] || "🎁"}</div>`;
-    ov.innerHTML = `<div class="card-ov unlock"><div class="kicker">🔓 NEW UPGRADE UNLOCKED!</div><h3>${esc(u.title)}</h3>
+    ov.innerHTML = `<div class="card-ov unlock"><div class="kicker">🔓 NEW TOOL!</div><h3>${esc(u.title)}</h3>
       <div class="body">${fig}<p>${esc(info.text)}</p>${info.tryit ? `<p class="tryit">👉 ${esc(info.tryit)}</p>` : ""}</div>
-      <div class="foot" style="text-align:center"><button class="primary" id="gotIt">${unlockQueue.length > 1 ? "Next upgrade ▶" : "Let me try it! 🛠️"}</button></div></div>`;
+      <div class="foot" style="text-align:center"><button class="primary" id="gotIt">${unlockQueue.length > 1 ? "Next tool ▶" : "Try it! 🛠️"}</button></div></div>`;
     document.getElementById("gotIt").onclick = () => {
       newKeys.add(u.key); if (u.key === "biomimetic") newKeys.add("wing_types");
       unlockQueue.shift();
@@ -474,8 +478,8 @@ function renderOverlay() {
   }
   if (phase === "rescued") {
     ov.innerHTML = `<div class="card-ov" style="text-align:center"><h3>🎉 Link is rescued!</h3>
-      <div>The message reached the mainland in round ${S.rounds_flown}. Total: <b class="gold">${S.points} ⭐</b></div>
-      <div class="muted" style="margin:8px 0">Scroll down to find out what was real and what was game.</div>
+      <div>Message delivered in round ${S.rounds_flown}! <b class="gold">${S.points} ⭐</b></div>
+      <div class="muted" style="margin:8px 0">Scroll down for the debrief.</div>
       <button id="again">🔄 Play again</button></div>`;
     document.getElementById("again").onclick = () => send("restart");
     return;
@@ -483,10 +487,42 @@ function renderOverlay() {
   ov.innerHTML = "";
 }
 
-function finishIntro() { phase = "build"; renderAll(); send("intro_done"); }
+const TUTORIAL = [
+  { sel: ".cards", text: "These are your 3 wings. Each shows its shape." },
+  { sel: "#launch", text: "Press Launch to fly all three at once." },
+  { sel: "#hud", text: "Points come only from beating your record 🏆." },
+  { sel: "#roadmap", text: "Points unlock tools here. Hover a slot for a preview." },
+];
+let tutStep = -1;
+function tutorialDone() { try { return sessionStorage.getItem("wl_tut_done") === "1"; } catch (e) { return false; } }
+function endTutorial() {
+  tutStep = -1; try { sessionStorage.setItem("wl_tut_done", "1"); } catch (e) { /* ignore */ }
+  renderTutorial();
+}
+function renderTutorial() {
+  const box = document.getElementById("coach"), game = document.getElementById("game");
+  document.querySelectorAll(".coach-target").forEach((el) => el.classList.remove("coach-target"));
+  if (tutStep < 0 || phase !== "build") { box.classList.add("hidden"); return; }
+  const step = TUTORIAL[tutStep], target = document.querySelector(step.sel);
+  if (!target) { box.classList.add("hidden"); return; }
+  target.classList.add("coach-target");
+  const last = tutStep === TUTORIAL.length - 1;
+  box.innerHTML = `<div class="who">QUICK TUTORIAL ${tutStep + 1}/${TUTORIAL.length}</div>${step.text}
+    <div class="btns"><button id="tutSkip">Skip tutorial</button><button class="primary" id="tutNext">${last ? "Got it! 🚀" : "Next ▶"}</button></div>`;
+  box.classList.remove("hidden");
+  const g = game.getBoundingClientRect(), r = target.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight;
+  const controls = document.getElementById("controls").getBoundingClientRect();
+  const inControls = r.top >= controls.top - 1;              // panel targets: tip floats above the panel, over the sea
+  const top = inControls ? controls.top - g.top - bh - 12 : r.bottom - g.top + 12;
+  box.style.top = Math.max(8, top) + "px";
+  box.style.left = Math.max(8, Math.min(g.width - bw - 8, r.left - g.left + r.width / 2 - bw / 2)) + "px";
+  document.getElementById("tutSkip").onclick = endTutorial;
+  document.getElementById("tutNext").onclick = () => { if (last) endTutorial(); else { tutStep++; renderTutorial(); } };
+}
+function finishIntro() { phase = "build"; if (!tutorialDone()) tutStep = 0; renderAll(); send("intro_done"); }
 function toBuild() { phase = "build"; renderAll(); }
 function hasPendingUnlock() { const r = S && S.last_round; return !!(r && r.new_unlocks.length && shownUnlockRound !== r.round); }
-function continueLabel() { return hasPendingUnlock() ? "🎁 Open your new upgrade!" : "🛠️ Build next round"; }
+function continueLabel() { return hasPendingUnlock() ? "🎁 Open new tool!" : "🛠️ Next round"; }
 function continueFromResults() {
   if (!hasPendingUnlock()) return toBuild();
   shownUnlockRound = S.last_round.round; unlockQueue = S.last_round.new_unlocks.slice();
@@ -502,7 +538,7 @@ function renderPanel() {
     const fig = line.fig === "flow" ? Figures.flow("cambered", 6, 0.62) : line.fig === "shapes" ? Figures.shapes(["symmetric", "cambered"])
               : line.fig === "whale" ? Figures.planform([30.4]) : "";
     panel.innerHTML = `<div class="dialog"><div class="txt"><div class="who">🧍 Link <span class="muted">(${introIdx + 1}/${INTRO.length})</span></div><div id="introText"></div>
-      <div class="btns"><button id="skip">Skip intro</button>
+      <div class="btns"><button id="skip">Skip story</button>
       <button class="primary" id="next">${last ? "Let's build! 🛠️" : "Next ▶"}</button></div></div>${fig ? `<div class="figbox">${fig}</div>` : ""}</div>`;
     document.getElementById("next").onclick = () => {
       if (introIdx < INTRO.length - 1) { introIdx++; introStart = performance.now(); renderPanel(); }
@@ -512,17 +548,20 @@ function renderPanel() {
     return;
   }
   if (phase === "rescue" || phase === "rescued") {
-    panel.innerHTML = `<div class="muted" style="padding:6px 2px">🎉 Workshop closed: Link is going home!</div>`; return;
+    panel.innerHTML = `<div class="muted" style="padding:6px 2px">🎉 Link is going home!</div>`; return;
   }
   const busy = phase !== "build";
   const hidden = pendingKeys(), can = (k) => has(k) && !hidden.has(k);
   const earned = S.upgrades.filter((u) => can(u.key));
-  const allDone = earned.length === S.upgrades.length;
-  const strip = !can("wing_types")
-    ? `<div class="notice">🔒 <b>Round 1:</b> Link only has scraps, so these three wings come pre-built and can't be changed yet. Just press <b>Launch!</b><br>
-       Every time you <b>beat your record</b>, you earn points that unlock new workshop tools.</div>`
-    : `<div class="strip">${earned.map((u) => `<span class="badge">✓ ${esc(u.title)} · earned at ${u.points}⭐</span>`).join("")}
-       ${allDone ? "" : `<span class="badge hint">🔒 More tools unlock as you beat your record</span>`}</div>`;
+  const preview = { wing_types: () => Figures.icon("symmetric") + Figures.icon("cambered"), angle: () => Figures.angle(10),
+                    biomimetic: () => Figures.icon("biomimetic"), bump_height: () => Figures.planform([26.2, 32.7]) };
+  const roadmap = `<div id="roadmap" class="roadmap"><span class="rm-title">🧰 Tools ${earned.length}/${S.upgrades.length}</span>` +
+    S.upgrades.map((u) => can(u.key)
+      ? `<span class="slot got" tabindex="0">${esc(u.title)}<span class="tipbox"><b>${esc(u.title)}</b><br>${esc(u.text)}<br>
+         <span class="muted">Earned at ${u.points}⭐</span>${preview[u.key] ? `<span class="tipfig">${preview[u.key]()}</span>` : ""}</span></span>`
+      : `<span class="slot locked" tabindex="0">🔒 ?<span class="tipbox"><b>Mystery tool</b><br>Beat your record to unlock it.</span></span>`).join("") + `</div>`;
+  const strip = (!can("wing_types")
+    ? `<div class="notice">🔒 <b>Round 1:</b> wings are pre-built. Just press <b>Launch!</b> Beat your record to unlock tools.</div>` : "") + roadmap;
   const nw = (k) => newKeys.has(k) ? " new" : "", tag = (k) => newKeys.has(k) ? `<span class="newtag">NEW</span>` : "";
   const angle = can("angle")
     ? `<label class="${nw("angle")}">📐 Launch angle <b id="angVal">${cfg.angle}°</b>${tag("angle")}<br><input id="ang" type="range" min="0" max="24" step="1" value="${cfg.angle}" ${busy ? "disabled" : ""}></label>`
@@ -537,13 +576,13 @@ function renderPanel() {
     const fam = cfg.families[i], st = S.starters[i];
     const famCtl = `<div class="famrow">${Figures.icon(fam)}` + (can("wing_types")
       ? `<select class="${nw(can("biomimetic") && newKeys.has("biomimetic") ? "biomimetic" : "wing_types")}" data-fam="${i}" ${busy ? "disabled" : ""}>${families.map(f => `<option value="${f}" ${f === fam ? "selected" : ""}>${FAMILY[f]}</option>`).join("")}</select>`
-      : `<span><b>${FAMILY[fam]}</b><span class="lockchip">🔒 locked for now</span></span>`) + `</div>`;
+      : `<span><b>${FAMILY[fam]}</b><span class="lockchip">🔒 locked</span></span>`) + `</div>`;
     let bump = "";
     if (fam === "biomimetic") {
       const g = S.bumps[cfg.bumps[i]];
       bump = can("bump_height")
         ? `<div class="${nw("bump_height")}" style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b>${tag("bump_height")}<input type="range" min="0" max="${S.bumps.length - 1}" step="1" value="${cfg.bumps[i]}" data-bump="${i}" ${busy ? "disabled" : ""}></div>`
-        : `<div style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b><span class="lockchip">🔒 locked for now</span></div>`;
+        : `<div style="margin-top:4px">Bump height <b>${g.amp.toFixed(1)} mm</b><span class="lockchip">🔒 locked</span></div>`;
       bump += `<div class="muted">Bumps ${g.amp.toFixed(1)} mm tall, ${g.wave.toFixed(1)} mm apart</div>`;
     }
     const ang = can("angle") ? cfg.angle : st.angle;
@@ -552,10 +591,10 @@ function renderPanel() {
       ${famCtl}${bump}<div class="muted" style="margin-top:4px">Angle ${ang}°${can("angle") ? "" : " 🔒"} · ${can("speed") ? cfg.speed : S.speeds[0]} m/s${can("speed") ? "" : " 🔒"}</div>${scout}</div>`;
   }).join("");
   const label = phase === "waiting" ? "⏳ Launching..." : phase === "flying" ? "✈️ Flying..." : phase === "results" ? continueLabel()
-              : phase === "unlock" ? "🎁 Check out your new upgrade above!" : "🚀 Launch!";
+              : phase === "unlock" ? "🎁 See your new tool above" : "🚀 Launch!";
   panel.innerHTML = `${strip}
     ${angle || speed || scoutBtn ? `<div class="controls">${angle}${speed}${scoutBtn}</div>` : ""}
-    ${can("bump_height") ? '<div class="muted" style="margin-bottom:6px">In the CFD data, bump height and spacing always changed together, so the six real designs are offered as pairs.</div>' : ""}
+    ${can("bump_height") ? '<div class="muted" style="margin-bottom:6px">Bump height and spacing come as the 6 CFD-tested pairs.</div>' : ""}
     <div class="cards">${cards}</div>
     <button id="launch" class="primary" ${busy && phase !== "results" ? "disabled" : ""}>${label}</button>
     ${S.error ? `<div class="err">⚠️ ${esc(S.error)}</div>` : ""}`;
@@ -570,7 +609,8 @@ function renderPanel() {
     r.onchange = () => renderPanel();
   });
   if (q("#scout")) q("#scout").onclick = () => send("scout", { config: cfg });
-  q("#launch").onclick = () => { if (phase === "results") return continueFromResults(); if (phase !== "build") return; newKeys.clear(); phase = "waiting"; waitingSince = performance.now(); renderPanel(); send("launch", { config: cfg }); };
+  q("#launch").onclick = () => { if (phase === "results") return continueFromResults(); if (phase !== "build") return; if (tutStep >= 0) endTutorial(); newKeys.clear(); phase = "waiting"; waitingSince = performance.now(); renderPanel(); send("launch", { config: cfg }); };
+  if (tutStep >= 0) renderTutorial();
 }
 
 post("streamlit:componentReady", { apiVersion: 1 });

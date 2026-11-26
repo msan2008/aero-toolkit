@@ -78,17 +78,17 @@ DEFAULT_ANGLE = 8
 # (checked in tests), so a player can never get stuck.
 UPGRADES: List[Dict[str, Any]] = [
     {"key": "wing_types", "points": 60, "title": "🪵 Wing Workshop",
-     "text": "Choose symmetric or cambered for each of your three wings."},
+     "text": "Pick each wing's shape."},
     {"key": "angle", "points": 66, "title": "📐 Launch Ramp",
-     "text": "Set the launch angle (angle of attack) for this round's wings."},
+     "text": "Set the launch angle."},
     {"key": "speed", "points": 71, "title": "💨 Turbo Catapult",
-     "text": "Launch at 30 m/s for more launch power. Watch what it does to x/c!"},
+     "text": "Launch at 15 or 30 m/s."},
     {"key": "biomimetic", "points": 75, "title": "🐋 Whale Wing",
-     "text": "Unlock the biomimetic wing with humpback-whale tubercles."},
+     "text": "A wing with whale-flipper bumps."},
     {"key": "bump_height", "points": 95, "title": "⛰️ Bump Height",
-     "text": "Pick from the six simulated tubercle designs (bump height and spacing)."},
+     "text": "Choose from 6 CFD-tested bump sizes."},
     {"key": "wind_scout", "points": 97, "title": "🔭 Wind Scout",
-     "text": "Preview the model's x/c for every wing before you launch."},
+     "text": "Preview each wing's x/c before launching."},
 ]
 
 
@@ -283,31 +283,24 @@ def handle_event(state: Dict[str, Any], event: Dict[str, Any]) -> Dict[str, Any]
 # aerodynamics and never claim that a wing has more lift, less drag, or is better.
 CONCEPTS: Dict[str, Dict[str, str]] = {
     "separation": {"title": "Flow separation", "text": (
-        "Air flowing over a wing tries to follow its curved top surface. Where it can't keep up, it breaks "
-        "away into swirling, messy air. That spot is the separation point, x/c: 0 is the front edge, 1 is "
-        "the back edge. The farther back it is, the more of the wing still has smooth air flowing over it.")},
+        "Air follows the wing's top until it can't, then breaks into swirls. That spot is x/c: "
+        "0 = front edge, 1 = back edge.")},
     "camber": {"title": "Wing shape (camber)", "text": (
-        "A symmetric wing is the same on top and bottom. A cambered wing is arched on top, like a bird's "
-        "wing. The shape changes how the air pressure varies along the surface, and that decides how far "
-        "the air can follow the wing before it breaks away.")},
+        "Symmetric: same top and bottom. Cambered: arched on top. The shape changes the air pressure "
+        "along the wing, which sets how far the air can follow it.")},
     "angle": {"title": "Angle of attack", "text": (
-        "Tilting a wing more steeply makes the air work harder to stay on the top surface as it flows toward "
-        "the back. The steeper the tilt, the sooner it gives up and separates. Tilt too far and most of the "
-        "top is covered in separated air: that is called a stall.")},
+        "A steeper tilt makes it harder for air to stay on top, so it separates sooner. "
+        "Too steep and the wing stalls.")},
     "speed": {"title": "Airspeed", "text": (
-        "Speed changes how the thin layer of air touching the wing behaves, in ways that aren't always "
-        "obvious (scientists use a number called the Reynolds number to describe it). In these CFD results "
-        "faster was not automatically better, which is why engineers test instead of guessing.")},
+        "Speed changes the thin layer of air on the wing in surprising ways. Faster wasn't always "
+        "better here, which is why engineers test.")},
     "tubercles": {"title": "Tubercles (whale bumps)", "text": (
-        "The bumps on a humpback whale's flipper stir up small swirls of air called vortices. These pull "
-        "faster-moving air down close to the surface and give the slow air there extra energy, which can "
-        "help the flow stay attached longer.")},
+        "The bumps make small swirls (vortices) that feed energy to slow air near the surface, "
+        "which can keep it attached longer.")},
     "bumps": {"title": "Bump size", "text": (
-        "Bigger bumps are not automatically better. The height and spacing of tubercles change the swirls "
-        "they make, so engineers test many sizes to find what works for each situation.")},
+        "Bigger bumps aren't automatically better: size and spacing change the swirls, so engineers test many.")},
     "repeat": {"title": "Repeatable results", "text": (
-        "Same wing, same settings, same answer: the model gives the same prediction every time. To learn "
-        "something new, change one thing and compare.")},
+        "Same settings, same answer. Change one thing to learn something new.")},
 }
 _VAR_NAME = {"family": "wing shape", "bump": "bump size", "angle": "launch angle", "speed": "launch speed"}
 _FAMILY_WORD = {"symmetric": "symmetric", "cambered": "cambered", "biomimetic": "whale"}
@@ -327,21 +320,15 @@ def _diff(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
 def _observe(var: str, hi: Dict[str, Any], lo: Dict[str, Any], threshold: float) -> Dict[str, str]:
     """Describe a fair comparison between two flights that differ only in `var`."""
     sh, sl, xh, xl = _settings(hi), _settings(lo), hi["x_over_c"], lo["x_over_c"]
-    label = {"family": lambda s: f"on the {_FAMILY_WORD[s['family']]} wing", "angle": lambda s: f"at {s['angle']}°",
-             "speed": lambda s: f"at {s['speed']} m/s", "bump": lambda s: f"with {s['bump']} mm bumps"}[var]
+    label = {"family": lambda s: f"{_FAMILY_WORD[s['family']].capitalize()} wing", "angle": lambda s: f"{s['angle']}°",
+             "speed": lambda s: f"{s['speed']} m/s", "bump": lambda s: f"{s['bump']} mm bumps"}[var]
+    obs = f"{label(sh)}: x/c {xh:.2f} · {label(sl)}: x/c {xl:.2f}."
     if abs(xh - xl) <= threshold:
-        obs = (f"Changing only the {_VAR_NAME[var]} barely mattered here: {label(sh)} the model predicts x/c "
-               f"{xh:.2f}, {label(sl)} x/c {xl:.2f}. That's within the model's typical error.")
-    else:
-        obs = (f"{label(sh).capitalize()}, the air stayed attached to x/c {xh:.2f}; {label(sl)}, it separated "
-               f"sooner, at x/c {xl:.2f}.")
-        if var == "angle" and sh["angle"] > sl["angle"]:
-            obs += " Surprise: here the steeper wing kept the air attached longer. Real airflow doesn't always follow simple rules."
-        if var == "bump" and sh["bump"] > sl["bump"]:
-            obs += " Here the taller bumps helped more."
+        obs += " Too close to call (within model error)."
+    elif var == "angle" and sh["angle"] > sl["angle"]:
+        obs += " Surprise: steeper did better here!"
     if var == "family":
         concept = "tubercles" if "biomimetic" in (sh["family"], sl["family"]) else "camber"
-        obs = obs.replace(", the air", " the air", 1) if obs.startswith("On the") else obs
     else:
         concept = {"angle": "angle", "speed": "speed", "bump": "bumps"}[var]
     return {"concept": concept, "observation": obs}
@@ -366,15 +353,14 @@ def round_lesson(rounds: List[Dict[str, Any]]) -> Dict[str, Any]:
                 a, b = sorted((flights[i], flights[j]), key=lambda f: -f["x_over_c"])
                 pairs.append((priority.index(d[0]), -abs(a["x_over_c"] - b["x_over_c"]), i, j, d[0], a, b))
     if rnd["round"] == 1:
+        worst = min(flights, key=lambda f: f["x_over_c"])
         lesson.update(concept="separation", observation=(
-            f"{best['name']} kept smooth air over the first {best['x_over_c'] * 100:.0f}% of its top surface. "
-            f"{min(flights, key=lambda f: f['x_over_c'])['name']} lost it sooner, at "
-            f"{min(f['x_over_c'] for f in flights) * 100:.0f}%. In this game, the farther back the air "
-            "separates, the farther the glider glides."))
+            f"{best['name']}: smooth air over {best['x_over_c'] * 100:.0f}% of its top · {worst['name']}: "
+            f"only {worst['x_over_c'] * 100:.0f}%. Farther back = farther glide."))
     elif pairs:
         _, _, _, _, var, hi, lo = min(pairs, key=lambda p: p[:4])
         lesson.update(_observe(var, hi, lo, threshold))
-        lesson["fair"] = f"Fair test: {hi['name']} and {lo['name']} differed only in {_VAR_NAME[var]}."
+        lesson["fair"] = f"Fair test: only the {_VAR_NAME[var]} differed ({hi['name']} vs {lo['name']})."
     elif prev is not None:
         # 2) all three wings alike: compare with the previous round
         now_s = [_settings(f) for f in flights]
@@ -382,20 +368,17 @@ def round_lesson(rounds: List[Dict[str, Any]]) -> Dict[str, Any]:
         changes = sorted({k for a, b in zip(now_s, prev_s) for k in _diff(a, b)}, key=priority.index)
         nb, pb = best, max(prev["flights"], key=lambda f: f["x_over_c"])
         if not changes:
-            lesson.update(concept="repeat", observation=(
-                f"You launched the same wings as last round, and the model predicted the same x/c "
-                f"({nb['x_over_c']:.2f}) again."))
+            lesson.update(concept="repeat", observation=f"Same wings as last round, same x/c ({nb['x_over_c']:.2f}).")
         elif len(changes) == 1:
             hi, lo = (nb, pb) if nb["x_over_c"] >= pb["x_over_c"] else (pb, nb)
             lesson.update(_observe(changes[0], hi, lo, threshold))
-            lesson["observation"] = "Compared with last round: " + lesson["observation"][0].lower() + lesson["observation"][1:]
-            lesson["fair"] = f"Fair test: since last round you changed only the {_VAR_NAME[changes[0]]}."
+            lesson["observation"] = "Vs. last round: " + lesson["observation"]
+            lesson["fair"] = f"Fair test: only the {_VAR_NAME[changes[0]]} changed since last round."
         else:
             lesson.update(concept="camber" if nb["inputs"]["airfoil_family"] != "biomimetic" else "tubercles",
-                          observation=f"This round's latest separation point was x/c {nb['x_over_c']:.2f} "
-                                      f"(last round: {pb['x_over_c']:.2f}).")
-            lesson["tip"] = (f"You changed {len(changes)} things at once ({', '.join(_VAR_NAME[c] for c in changes)}), "
-                             "so it's hard to tell which one made the difference. Try changing one thing at a time.")
+                          observation=f"Latest separation: x/c {nb['x_over_c']:.2f} (last round {pb['x_over_c']:.2f}).")
+            lesson["tip"] = (f"You changed {len(changes)} things ({', '.join(_VAR_NAME[c] for c in changes)}). "
+                             "Change one thing at a time to see which helped.")
     else:
         lesson.update(concept="separation", observation=f"{best['name']} reached x/c {best['x_over_c']:.2f}.")
     c = CONCEPTS[lesson["concept"]]

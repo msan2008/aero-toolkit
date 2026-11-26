@@ -100,33 +100,25 @@ if state["rounds"]:
     )
 
 st.info(
-    "**What's real and what's game?** Each wing's **x/c** is a real prediction from WingCheck's "
-    "machine-learning model. **Distance, height and points** are invented **game rules**: here, "
-    "distance is proportional to x/c (1.5× the x/c flies 1.5× as far). Real wings also depend on "
-    "lift, drag, weight and much more. **Weather, time of day and music are just atmosphere**: "
-    "the model was never given wind or rain, so they never change any prediction or result.",
+    "**Real vs. game:** each wing's **x/c** is a real ML prediction. Distance, points, weather and "
+    "music are game elements and never change a prediction.",
     icon="🎮",
 )
 
 with st.expander("📖 Field notes: biomimicry and flow separation"):
     st.markdown(
-        "**Flow separation.** Air flowing over a wing tries to follow its curved top surface. "
-        "When the wing is tilted steeply, the air can't keep up and **breaks away**. Behind that "
-        "point the flow is messy and turbulent. WingCheck's model predicts **where** that happens "
-        "as a fraction of the chord, **x/c**: 0 = the front edge, 1 = the back edge.\n\n"
-        "**Biomimicry.** Humpback whales have bumps called **tubercles** on the front of their "
-        "flippers. Wind-tunnel studies on flipper-shaped models found tubercles can change how "
-        "airflow separates at high angles, so engineers test them on wings."
+        "**Flow separation:** where air stops following the wing's top, given as **x/c** "
+        "(0 = front edge, 1 = back edge).\n\n"
+        "**Biomimicry:** humpback-whale flippers have bumps (**tubercles**) that can change where "
+        "flow separates, so engineers test them on wings."
     )
 
 with st.expander("🧮 How the game turns x/c into distance and points"):
     st.markdown(
-        f"`distance = {game.DISTANCE_SCALE:.0f} m × launch power × x/c` (**game rule, not physics**)\n\n"
-        "- **Launch power** (0–1) comes only from launch angle and speed, and can never go above 1.\n"
-        f"- So reaching the 1,000 m mainland needs **x/c ≥ {game.WIN_X_OVER_C:.2f}**: only wings the "
-        "model predicts keep their flow attached that far back can ever make it.\n"
-        "- **Points** are only earned by **beating your own record**: 1 point per 10 m of "
-        "improvement. Relaunching the same wing earns nothing, so experiment!"
+        f"`distance = {game.DISTANCE_SCALE:.0f} m × launch power × x/c` (game rule, not physics)\n\n"
+        "- Launch power comes from angle and speed (max 1).\n"
+        f"- Reaching 1,000 m needs **x/c ≥ {game.WIN_X_OVER_C:.2f}**.\n"
+        "- Points only for **beating your record** (1 per 10 m)."
     )
     if state["rounds"]:
         st.dataframe(pd.DataFrame([{
@@ -134,25 +126,22 @@ with st.expander("🧮 How the game turns x/c into distance and points"):
             "Model x/c": round(f["x_over_c"], 3), "Launch power": round(f["launch_power"], 2),
             "Distance (m)": round(f["distance"]),
         } for f in state["rounds"][-1]["flights"]]), hide_index=True, use_container_width=True)
-        st.caption(f"The model's typical error is about ±{game.comparison_threshold():.2f} x/c, so "
-                   "wings with very close x/c values may not really be different.")
+        st.caption(f"Model error ≈ ±{game.comparison_threshold():.2f} x/c: very close values may not really differ.")
 
 # -----------------------------------------------------------------------------
 # Debrief and quiz (after the rescue animation has played)
 # -----------------------------------------------------------------------------
 QUIZ_OPTIONS = [
-    "Yes. Later separation always means a real wing flies farther.",
-    "Not necessarily. Real distance also depends on lift, drag, weight and more, and the game made up its distance rule.",
-    "No. Later separation always means more drag, so real wings fly shorter.",
+    "Yes, always.",
+    "Not necessarily: real flight also depends on lift, drag and weight, and the game invented its distance rule.",
+    "No, later separation always means more drag.",
 ]
 QUIZ_CORRECT = 1
 QUIZ_FEEDBACK = [
-    "Not quite. In this game we *chose* to make higher x/c fly farther. Real flight distance also "
-    "depends on lift, drag, weight and conditions the model doesn't predict.",
-    "Correct! The model predicts one thing, where flow separates. The game invented the link to "
-    "distance. Real engineers would also check lift, drag and weight, and confirm with CFD or a wind tunnel.",
-    "Not quite. Later separation doesn't *always* mean more drag. The real point is that this model "
-    "predicts separation location only, so it can't tell you about drag or distance at all.",
+    "Not quite. The game *chose* to link x/c to distance; real flight depends on much more.",
+    "Correct! The model only predicts where flow separates. Engineers also check lift, drag and weight, "
+    "then test with CFD or a wind tunnel.",
+    "Not quite. This model only predicts separation, so it can't tell you about drag at all.",
 ]
 
 if state["won"] and state["rescue_seen"]:
@@ -161,22 +150,14 @@ if state["won"] and state["rescue_seen"]:
     w_in = winner["inputs"]
     bump = (f" with {w_in['tubercle_amplitude']:.1f} mm bumps" if w_in["airfoil_family"] == "biomimetic" else "")
     st.markdown(
-        f"**{winner['name']}** carried the bottle to the mainland in round {len(state['rounds'])}: a "
-        f"{FAMILY_LABEL[w_in['airfoil_family']].lower()} wing{bump}, launched at {w_in['angle_of_attack']:.0f}° "
-        f"and {w_in['airspeed']} m/s. The model predicted separation at **x/c = {winner['x_over_c']:.2f}**."
+        f"**{winner['name']}** made it in round {len(state['rounds'])}: "
+        f"{FAMILY_LABEL[w_in['airfoil_family']].lower()} wing{bump}, {w_in['angle_of_attack']:.0f}°, "
+        f"{w_in['airspeed']} m/s, **x/c = {winner['x_over_c']:.2f}**."
     )
-    st.subheader("What was real and what was game?")
+    st.subheader("Real vs. game")
     st.table(pd.DataFrame({
-        "Real (ML model, trained on CFD)": [
-            "Each wing's x/c separation prediction",
-            "Which inputs are allowed (only ones the model learned from)",
-            "How angle, speed, wing type and bumps changed x/c",
-        ],
-        "Game (made up for fun)": [
-            "Flight distance, height and the animations",
-            "Launch power from angle and speed",
-            "Points, upgrades, and the mainland at 1,000 m",
-        ],
+        "Real (ML model, trained on CFD)": ["x/c predictions", "Allowed inputs", "How settings changed x/c"],
+        "Game (made up for fun)": ["Distance and animations", "Launch power", "Points, upgrades, 1,000 m goal"],
     }))
     learned = []
     for rnd in state["rounds"]:
@@ -184,12 +165,12 @@ if state["won"] and state["rescue_seen"]:
         if les and les["title"] not in [t for t, _ in learned]:
             learned.append((les["title"], les["explain"]))
     if learned:
-        st.subheader("🔬 What you discovered in the lab")
+        st.subheader("🔬 What you discovered")
         for title, text in learned:
             st.markdown(f"**{title}:** {text}")
     st.subheader("🧠 Think like an engineer")
     choice = st.radio(
-        "In the game, wings with higher x/c flew farther. Does later separation mean a real wing always flies farther?",
+        "Does later separation mean a real wing always flies farther?",
         options=range(len(QUIZ_OPTIONS)), format_func=lambda i: QUIZ_OPTIONS[i], index=None,
         key="wl_quiz_choice", on_change=lambda: ss.update(wl_quiz_checked=False),
     )
@@ -225,14 +206,10 @@ with st.expander("ℹ️ About the model and its limits"):
     mae = f"{metrics['mae']:.3f} x/c" if "mae" in metrics else "N/A"
     r2 = f"{metrics['r2']:.3f}" if "r2" in metrics else "N/A"
     st.markdown(
-        f"- **Model file:** `{Path(get_loaded_model_path()).name}` (Extra Trees regressor)\n"
-        "- **Trained on:** about 1,700 Autodesk CFD simulations (Phase 2 dataset)\n"
-        f"- **Held-out test error:** MAE {mae}, R² {r2}\n"
-        "- **Predicts:** separation location `separation_x_over_c` only\n"
-        "- **Does not predict:** lift, drag, flight distance, efficiency, battery life, or emissions\n"
-        "- **Inputs allowed in this game:** symmetric, cambered or biomimetic wings; the six simulated "
-        "tubercle designs; angles 0–24° in whole degrees; airspeeds 15 or 30 m/s\n"
-        "- The story, animations, distances and points are **conceptual game elements**, not CFD or physics.\n"
-        "- This is an educational screening prototype, not a replacement for CFD, wind-tunnel testing, "
-        "or professional aerodynamic design."
+        f"- **Model:** `{Path(get_loaded_model_path()).name}` (Extra Trees), ~1,700 Autodesk CFD runs; "
+        f"test MAE {mae}, R² {r2}\n"
+        "- **Predicts** separation location (x/c) only, not lift, drag, distance or efficiency\n"
+        "- **Inputs:** the 3 wing types, 6 CFD bump designs, 0–24°, 15 or 30 m/s\n"
+        "- Story, animations, distance and points are game elements. An educational prototype, "
+        "not a replacement for CFD or wind-tunnel testing."
     )
